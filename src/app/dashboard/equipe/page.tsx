@@ -94,7 +94,11 @@ export default function DashboardEquipe() {
       setModalOpen(false);
     } catch (error) {
       console.error("Erro ao criar membro:", error);
-      alert("Erro ao criar membro: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar membro: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -123,7 +127,11 @@ export default function DashboardEquipe() {
       setMemberToEdit(null);
     } catch (error) {
       console.error("Erro ao atualizar membro:", error);
-      alert("Erro ao atualizar membro: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar membro: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -150,7 +158,11 @@ export default function DashboardEquipe() {
       setMemberToDelete(null);
     } catch (error) {
       console.error("Erro ao excluir membro:", error);
-      alert("Erro ao excluir membro: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir membro: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 

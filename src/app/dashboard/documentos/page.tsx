@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const folders = [
   { name: "Todos", count: 0 },
@@ -55,6 +56,7 @@ const typeColors: Record<string, string> = {
 };
 
 export default function DashboardDocumentos() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [folderFilter, setFolderFilter] = useState<string>("Todos");
   const [modalOpen, setModalOpen] = useState(false);
@@ -104,7 +106,11 @@ export default function DashboardDocumentos() {
       setModalOpen(false);
     } catch (error) {
       console.error("Erro ao criar documento:", error);
-      alert("Erro ao criar documento: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar documento: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -133,7 +139,11 @@ export default function DashboardDocumentos() {
       setDocumentToEdit(null);
     } catch (error) {
       console.error("Erro ao atualizar documento:", error);
-      alert("Erro ao atualizar documento: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar documento: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -160,7 +170,11 @@ export default function DashboardDocumentos() {
       setDocumentToDelete(null);
     } catch (error) {
       console.error("Erro ao excluir documento:", error);
-      alert("Erro ao excluir documento: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir documento: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 

@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const eventColors: Record<string, string> = {
   meeting: "bg-blue-500",
@@ -53,6 +54,7 @@ const monthNames = [
 ];
 
 export default function DashboardCalendario() {
+  const { toast } = useToast();
   const [currentDate] = useState(new Date(2026, 1, 20)); // Fevereiro 2026
   const [selectedDate, setSelectedDate] = useState<number | null>(20);
   const [modalOpen, setModalOpen] = useState(false);
@@ -102,7 +104,11 @@ export default function DashboardCalendario() {
       setModalOpen(false);
     } catch (error) {
       console.error("Erro ao criar evento:", error);
-      alert("Erro ao criar evento: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar evento: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -131,7 +137,11 @@ export default function DashboardCalendario() {
       setEventToEdit(null);
     } catch (error) {
       console.error("Erro ao atualizar evento:", error);
-      alert("Erro ao atualizar evento: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar evento: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -158,7 +168,11 @@ export default function DashboardCalendario() {
       setEventToDelete(null);
     } catch (error) {
       console.error("Erro ao excluir evento:", error);
-      alert("Erro ao excluir evento: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir evento: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 

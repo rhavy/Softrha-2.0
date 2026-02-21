@@ -45,8 +45,8 @@ interface Budget {
   projectType: string;
   complexity: string;
   timeline: string;
-  features: any[];
-  integrations: any[];
+  features: string | any[];
+  integrations: string | any[];
   pages: number;
   estimatedMin: number;
   estimatedMax: number;
@@ -119,6 +119,21 @@ export default function OrcamentoDetalhesPage() {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  // Função para parsear JSON string se necessário
+  const parseJsonField = (field: string | any[]): any[] => {
+    if (typeof field === "string") {
+      try {
+        return JSON.parse(field);
+      } catch {
+        return [];
+      }
+    }
+    return Array.isArray(field) ? field : [];
+  };
+
+  const featuresList = budget ? parseJsonField(budget.features) : [];
+  const integrationsList = budget ? parseJsonField(budget.integrations) : [];
 
   useEffect(() => {
     if (params.id) {
@@ -511,7 +526,7 @@ export default function OrcamentoDetalhesPage() {
             </Card>
 
             {/* Funcionalidades */}
-            {budget.features && budget.features.length > 0 && (
+            {featuresList.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -521,7 +536,7 @@ export default function OrcamentoDetalhesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {budget.features.map((featureId: string) => (
+                    {featuresList.map((featureId: string) => (
                       <Badge key={featureId} variant="secondary">
                         {featureLabels[featureId] || featureId}
                       </Badge>
@@ -532,7 +547,7 @@ export default function OrcamentoDetalhesPage() {
             )}
 
             {/* Integrações */}
-            {budget.integrations && budget.integrations.length > 0 && (
+            {integrationsList.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -542,7 +557,7 @@ export default function OrcamentoDetalhesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {budget.integrations.map((integrationId: string) => (
+                    {integrationsList.map((integrationId: string) => (
                       <Badge key={integrationId} variant="outline">
                         {integrationLabels[integrationId] || integrationId}
                       </Badge>

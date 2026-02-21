@@ -26,10 +26,10 @@ interface DashboardLayoutProps {
 
 const navItems = [
   { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
-  { icon: Users, label: "Clientes", href: "/dashboard/clientes" },
-  { icon: FolderKanban, label: "Projetos", href: "/dashboard/projetos" },
-  { icon: DollarSign, label: "Orçamentos", href: "/dashboard/orcamentos" },
   { icon: BarChart3, label: "Relatórios", href: "/dashboard/relatorios" },
+  { icon: Users, label: "Clientes", href: "/dashboard/clientes" },
+  { icon: DollarSign, label: "Orçamentos", href: "/dashboard/orcamentos" },
+  { icon: FolderKanban, label: "Projetos", href: "/dashboard/projetos" },
   { icon: Bell, label: "Notificações", href: "/dashboard/notificacoes" },
   { icon: Users, label: "Equipe", href: "/dashboard/equipe" },
   { icon: FileText, label: "Documentos", href: "/dashboard/documentos" },
@@ -67,8 +67,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${pathname === item.href
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     }`}
                 >
                   <item.icon className="h-4 w-4" />

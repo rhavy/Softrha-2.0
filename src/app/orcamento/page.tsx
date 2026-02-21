@@ -30,7 +30,9 @@ import {
   Calendar,
   Send,
   Calculator,
+  X,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Feriados nacionais fixos do Brasil (mês/dia)
 const FIXED_HOLIDAYS = [
@@ -107,7 +109,7 @@ function isHoliday(date: Date): boolean {
 function calculateBusinessDays(startDate: Date, businessDays: number): number {
   let count = 0;
   let current = new Date(startDate);
-  
+
   while (count < businessDays) {
     if (!isHoliday(current)) {
       count++;
@@ -116,7 +118,7 @@ function calculateBusinessDays(startDate: Date, businessDays: number): number {
       current.setDate(current.getDate() + 1);
     }
   }
-  
+
   return businessDays;
 }
 
@@ -124,7 +126,7 @@ function calculateBusinessDays(startDate: Date, businessDays: number): number {
 function getDeliveryDate(startDate: Date, businessDays: number): Date {
   let count = 0;
   let current = new Date(startDate);
-  
+
   while (count < businessDays) {
     if (!isHoliday(current)) {
       count++;
@@ -133,7 +135,7 @@ function getDeliveryDate(startDate: Date, businessDays: number): Date {
       current.setDate(current.getDate() + 1);
     }
   }
-  
+
   return current;
 }
 
@@ -149,7 +151,10 @@ interface BudgetState {
   features: string[];
   pages: number;
   integrations: string[];
-  name: string;
+  firstName: string;
+  lastName: string;
+  document: string;
+  documentType: "cpf" | "cnpj";
   email: string;
   phone: string;
   company: string;
@@ -184,6 +189,7 @@ const TIMELINE_DAYS: Record<string, { min: number; max: number; multiplier: numb
 };
 
 export default function Orcamento() {
+  const { toast } = useToast();
   const [budget, setBudget] = useState<BudgetState>({
     step: 1,
     projectType: null,
@@ -192,7 +198,10 @@ export default function Orcamento() {
     features: [],
     pages: 1,
     integrations: [],
-    name: "",
+    firstName: "",
+    lastName: "",
+    document: "",
+    documentType: "cpf",
     email: "",
     phone: "",
     company: "",
@@ -200,6 +209,7 @@ export default function Orcamento() {
   });
 
   const [calculated, setCalculated] = useState(false);
+  const [isVerifyingClient, setIsVerifyingClient] = useState(false);
 
   const projectTypes = [
     { id: "landing", label: "Landing Page", icon: Globe, basePrice: 2500, desc: "Página única para conversão", days: PROJECT_BASE_DAYS.landing },
@@ -313,6 +323,180 @@ export default function Orcamento() {
     }
   };
 
+  const handleFinalizar = () => {
+    setCalculated(true);
+  };
+
+  // Função para formatar CPF/CNPJ
+  const formatDocument = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    
+    if (digits.length <= 11) {
+      // CPF: 000.000.000-00
+      return digits
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+        .replace(/(-\d{2})\d+?$/, "$1");
+    } else {
+      // CNPJ: 00.000.000/0000-00
+      return digits
+        .replace(/(\d{2})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1/$2")
+        .replace(/(\d{4})(\d{1,2})/, "$1-$2")
+        .replace(/(-\d{2})\d+?$/, "$1");
+    }
+  };
+
+  // Função para formatar telefone
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    
+    if (digits.length <= 10) {
+      // Telefone fixo: (00) 0000-0000
+      return digits
+        .replace(/(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{4})(\d)/, "$1-$2")
+        .replace(/(-\d{4})\d+?$/, "$1");
+    } else {
+      // Celular: (00) 00000-0000
+      return digits
+        .replace(/(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{5})(\d)/, "$1-$2")
+        .replace(/(-\d{4})\d+?$/, "$1");
+    }
+  };
+
+  const handleSubmitBudget = async () => {
+    try {
+      // Validação dos campos obrigatórios
+      if (!budget.firstName || !budget.lastName) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Por favor, preencha nome e sobrenome.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!budget.document) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Por favor, preencha CPF ou CNPJ.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!budget.email && !budget.phone) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Por favor, preencha pelo menos um: Email ou Telefone.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsVerifyingClient(true);
+
+      const clientResponse = await fetch("/api/clientes/verificar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${budget.firstName} ${budget.lastName}`,
+          email: budget.email,
+          phone: budget.phone,
+          company: budget.company,
+          document: budget.document,
+          documentType: budget.documentType,
+        }),
+      });
+
+      const clientResultData = await clientResponse.json();
+
+      if (!clientResultData.success) {
+        toast({
+          title: "Erro",
+          description: clientResultData.error,
+          variant: "destructive",
+        });
+        setIsVerifyingClient(false);
+        return;
+      }
+
+      const clientMessage = clientResultData.isNewClient
+        ? `🎉 Seja bem vindo, ${clientResultData.client.name}!`
+        : `👋 Bem vindo de volta, ${clientResultData.client.name}!`;
+
+      // Agora, criar o orçamento
+      const budgetResponse = await fetch("/api/orcamentos/criar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectType: budget.projectType,
+          complexity: budget.complexity,
+          timeline: budget.timeline,
+          features: budget.features,
+          pages: budget.pages,
+          integrations: budget.integrations,
+          name: `${budget.firstName} ${budget.lastName}`,
+          email: budget.email,
+          phone: budget.phone,
+          company: budget.company,
+          details: budget.details,
+          document: budget.document,
+          documentType: budget.documentType,
+          estimatedMin: estimate.min,
+          estimatedMax: estimate.max,
+          finalValue: estimate.total,
+        }),
+      });
+
+      const budgetResult = await budgetResponse.json();
+
+      if (budgetResult.success) {
+        toast({
+          title: "Sucesso!",
+          description: `${clientMessage} ${budgetResult.message}`,
+          variant: "default",
+        });
+        // Resetar formulário
+        setBudget({
+          step: 1,
+          projectType: null,
+          complexity: null,
+          timeline: null,
+          features: [],
+          pages: 1,
+          integrations: [],
+          firstName: "",
+          lastName: "",
+          document: "",
+          documentType: "cpf",
+          email: "",
+          phone: "",
+          company: "",
+          details: "",
+        });
+        setCalculated(false);
+      } else {
+        toast({
+          title: "Erro",
+          description: budgetResult.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao enviar orçamento:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar orçamento. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingClient(false);
+    }
+  };
+
   const toggleFeature = (featureId: string) => {
     setBudget(prev => ({
       ...prev,
@@ -353,21 +537,18 @@ export default function Orcamento() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <Card
-                    className={`cursor-pointer transition-all hover:shadow-lg ${
-                      budget.projectType === type.id
+                    className={`cursor-pointer transition-all hover:shadow-lg ${budget.projectType === type.id
                         ? "border-primary bg-primary/5 shadow-md"
                         : ""
-                    }`}
+                      }`}
                     onClick={() => setBudget({ ...budget, projectType: type.id as ProjectType })}
                   >
                     <CardContent className="pt-6">
                       <div className="flex flex-col items-center text-center space-y-3">
-                        <div className={`h-16 w-16 rounded-xl flex items-center justify-center ${
-                          budget.projectType === type.id ? "bg-primary" : "bg-primary/10"
-                        }`}>
-                          <type.icon className={`h-8 w-8 ${
-                            budget.projectType === type.id ? "text-primary-foreground" : "text-primary"
-                          }`} />
+                        <div className={`h-16 w-16 rounded-xl flex items-center justify-center ${budget.projectType === type.id ? "bg-primary" : "bg-primary/10"
+                          }`}>
+                          <type.icon className={`h-8 w-8 ${budget.projectType === type.id ? "text-primary-foreground" : "text-primary"
+                            }`} />
                         </div>
                         <div>
                           <h4 className="font-semibold">{type.label}</h4>
@@ -392,7 +573,7 @@ export default function Orcamento() {
               <h3 className="text-2xl font-bold">Qual o nível de complexidade?</h3>
               <p className="text-muted-foreground">Isso nos ajuda a entender a sofisticação do seu projeto</p>
             </div>
-            
+
             <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
               <CardContent className="py-4">
                 <div className="flex items-start gap-3">
@@ -402,7 +583,7 @@ export default function Orcamento() {
                       Como a complexidade afeta o preço?
                     </p>
                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                      Projetos mais complexos exigem mais dias de trabalho. O cálculo considera 
+                      Projetos mais complexos exigem mais dias de trabalho. O cálculo considera
                       <strong> dias úteis (segunda a sexta-feira)</strong>, excluindo feriados nacionais.
                       Cada diária tem custo de <strong>R$ {DEVELOPER_DAY_RATE.toLocaleString("pt-BR")}</strong>.
                     </p>
@@ -419,21 +600,18 @@ export default function Orcamento() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <Card
-                    className={`cursor-pointer transition-all hover:shadow-lg ${
-                      budget.complexity === comp.id
+                    className={`cursor-pointer transition-all hover:shadow-lg ${budget.complexity === comp.id
                         ? "border-primary bg-primary/5 shadow-md"
                         : ""
-                    }`}
+                      }`}
                     onClick={() => setBudget({ ...budget, complexity: comp.id as Complexity })}
                   >
                     <CardContent className="pt-6">
                       <div className="flex flex-col items-center text-center space-y-3">
-                        <div className={`h-16 w-16 rounded-full flex items-center justify-center ${
-                          budget.complexity === comp.id ? "bg-primary" : "bg-primary/10"
-                        }`}>
-                          <Star className={`h-8 w-8 ${
-                            budget.complexity === comp.id ? "text-primary-foreground" : "text-primary"
-                          }`} />
+                        <div className={`h-16 w-16 rounded-full flex items-center justify-center ${budget.complexity === comp.id ? "bg-primary" : "bg-primary/10"
+                          }`}>
+                          <Star className={`h-8 w-8 ${budget.complexity === comp.id ? "text-primary-foreground" : "text-primary"
+                            }`} />
                         </div>
                         <div>
                           <h4 className="font-semibold">{comp.label}</h4>
@@ -460,7 +638,7 @@ export default function Orcamento() {
                 O cálculo considera apenas dias úteis (segunda a sexta, sem feriados)
               </p>
             </div>
-            
+
             <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
               <CardContent className="py-4">
                 <div className="flex items-start gap-3">
@@ -470,8 +648,8 @@ export default function Orcamento() {
                       Como calculamos o prazo?
                     </p>
                     <p className="text-xs text-blue-700 dark:text-blue-300">
-                      Trabalhamos apenas em <strong>dias úteis (segunda a sexta-feira)</strong>, 
-                      excluindo <strong>feriados nacionais</strong>. O prazo final é calculado 
+                      Trabalhamos apenas em <strong>dias úteis (segunda a sexta-feira)</strong>,
+                      excluindo <strong>feriados nacionais</strong>. O prazo final é calculado
                       somando os dias necessários conforme a complexidade e funcionalidades do seu projeto.
                     </p>
                   </div>
@@ -487,21 +665,18 @@ export default function Orcamento() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <Card
-                    className={`cursor-pointer transition-all hover:shadow-lg ${
-                      budget.timeline === time.id
+                    className={`cursor-pointer transition-all hover:shadow-lg ${budget.timeline === time.id
                         ? "border-primary bg-primary/5 shadow-md"
                         : ""
-                    }`}
+                      }`}
                     onClick={() => setBudget({ ...budget, timeline: time.id as Timeline })}
                   >
                     <CardContent className="pt-6">
                       <div className="flex flex-col items-center text-center space-y-3">
-                        <div className={`h-16 w-16 rounded-xl flex items-center justify-center ${
-                          budget.timeline === time.id ? "bg-primary" : "bg-primary/10"
-                        }`}>
-                          <time.icon className={`h-8 w-8 ${
-                            budget.timeline === time.id ? "text-primary-foreground" : "text-primary"
-                          }`} />
+                        <div className={`h-16 w-16 rounded-xl flex items-center justify-center ${budget.timeline === time.id ? "bg-primary" : "bg-primary/10"
+                          }`}>
+                          <time.icon className={`h-8 w-8 ${budget.timeline === time.id ? "text-primary-foreground" : "text-primary"
+                            }`} />
                         </div>
                         <div>
                           <h4 className="font-semibold">{time.label}</h4>
@@ -536,22 +711,19 @@ export default function Orcamento() {
                   whileTap={{ scale: 0.99 }}
                 >
                   <Card
-                    className={`cursor-pointer transition-all ${
-                      budget.features.includes(feature.id)
+                    className={`cursor-pointer transition-all ${budget.features.includes(feature.id)
                         ? "border-primary bg-primary/5"
                         : ""
-                    }`}
+                      }`}
                     onClick={() => toggleFeature(feature.id)}
                   >
                     <CardContent className="py-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                            budget.features.includes(feature.id) ? "bg-primary" : "bg-primary/10"
-                          }`}>
-                            <feature.icon className={`h-5 w-5 ${
-                              budget.features.includes(feature.id) ? "text-primary-foreground" : "text-primary"
-                            }`} />
+                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${budget.features.includes(feature.id) ? "bg-primary" : "bg-primary/10"
+                            }`}>
+                            <feature.icon className={`h-5 w-5 ${budget.features.includes(feature.id) ? "text-primary-foreground" : "text-primary"
+                              }`} />
                           </div>
                           <div>
                             <h4 className="font-medium text-sm">{feature.label}</h4>
@@ -585,22 +757,19 @@ export default function Orcamento() {
                   whileTap={{ scale: 0.99 }}
                 >
                   <Card
-                    className={`cursor-pointer transition-all ${
-                      budget.integrations.includes(integration.id)
+                    className={`cursor-pointer transition-all ${budget.integrations.includes(integration.id)
                         ? "border-primary bg-primary/5"
                         : ""
-                    }`}
+                      }`}
                     onClick={() => toggleIntegration(integration.id)}
                   >
                     <CardContent className="py-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                            budget.integrations.includes(integration.id) ? "bg-primary" : "bg-primary/10"
-                          }`}>
-                            <Code2 className={`h-5 w-5 ${
-                              budget.integrations.includes(integration.id) ? "text-primary-foreground" : "text-primary"
-                            }`} />
+                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${budget.integrations.includes(integration.id) ? "bg-primary" : "bg-primary/10"
+                            }`}>
+                            <Code2 className={`h-5 w-5 ${budget.integrations.includes(integration.id) ? "text-primary-foreground" : "text-primary"
+                              }`} />
                           </div>
                           <div>
                             <h4 className="font-medium text-sm">{integration.label}</h4>
@@ -652,14 +821,46 @@ export default function Orcamento() {
               <CardContent className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Nome Completo *</label>
+                    <label className="text-sm font-medium">Nome *</label>
                     <input
                       type="text"
-                      value={budget.name}
-                      onChange={(e) => setBudget({ ...budget, name: e.target.value })}
+                      value={budget.firstName}
+                      onChange={(e) => setBudget({ ...budget, firstName: e.target.value })}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      placeholder="João Silva"
+                      placeholder="João"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Sobrenome *</label>
+                    <input
+                      type="text"
+                      value={budget.lastName}
+                      onChange={(e) => setBudget({ ...budget, lastName: e.target.value })}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Silva"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">CPF ou CNPJ *</label>
+                    <input
+                      type="text"
+                      value={budget.document}
+                      onChange={(e) => {
+                        const formatted = formatDocument(e.target.value);
+                        const digits = e.target.value.replace(/\D/g, "");
+                        const documentType = digits.length > 11 ? "cnpj" : "cpf";
+                        setBudget({ ...budget, document: formatted, documentType });
+                      }}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="000.000.000-00"
+                      maxLength={18}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {budget.documentType === "cpf" ? "CPF (11 dígitos)" : "CNPJ (14 dígitos)"}
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Empresa</label>
@@ -672,9 +873,10 @@ export default function Orcamento() {
                     />
                   </div>
                 </div>
+
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Email *</label>
+                    <label className="text-sm font-medium">Email</label>
                     <input
                       type="email"
                       value={budget.email}
@@ -688,12 +890,20 @@ export default function Orcamento() {
                     <input
                       type="tel"
                       value={budget.phone}
-                      onChange={(e) => setBudget({ ...budget, phone: e.target.value })}
+                      onChange={(e) => {
+                        const formatted = formatPhone(e.target.value);
+                        setBudget({ ...budget, phone: formatted });
+                      }}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      placeholder="(11) 99999-9999"
+                      placeholder="(00) 00000-0000"
+                      maxLength={15}
                     />
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  * Preencha pelo menos um dos campos acima (Email ou Telefone)
+                </p>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Detalhes Adicionais</label>
                   <textarea
@@ -759,10 +969,10 @@ export default function Orcamento() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-orange-700 dark:text-orange-300">
-            Este é um <strong>orçamento estimativo</strong> baseado nas informações fornecidas. 
-            Os preços e valores podem alterar conforme condições específicas do projeto, como 
-            <strong> prazo, feriados, complexidade técnica e requisitos adicionais</strong>. 
-            O <strong>valor final será estipulado pela nossa equipe</strong> após análise detalhada 
+            Este é um <strong>orçamento estimativo</strong> baseado nas informações fornecidas.
+            Os preços e valores podem alterar conforme condições específicas do projeto, como
+            <strong> prazo, feriados, complexidade técnica e requisitos adicionais</strong>.
+            O <strong>valor final será estipulado pela nossa equipe</strong> após análise detalhada
             das suas necessidades e confirmação de todos os detalhes do projeto.
           </p>
         </CardContent>
@@ -790,8 +1000,8 @@ export default function Orcamento() {
                     <strong>Valor Final:</strong> Total de Dias × R$ {DEVELOPER_DAY_RATE.toLocaleString("pt-BR")} (diária) × Multiplicador do Prazo
                   </p>
                   <p className="mt-2">
-                    <strong>Importante:</strong> Trabalhamos apenas em <strong>dias úteis (segunda a sexta)</strong>, 
-                    sem trabalho em <strong>feriados nacionais</strong>. A complexidade do projeto influencia diretamente 
+                    <strong>Importante:</strong> Trabalhamos apenas em <strong>dias úteis (segunda a sexta)</strong>,
+                    sem trabalho em <strong>feriados nacionais</strong>. A complexidade do projeto influencia diretamente
                     no número de dias necessários.
                   </p>
                 </div>
@@ -807,7 +1017,7 @@ export default function Orcamento() {
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Previsão de Entrega</p>
               <p className="font-medium text-lg">
-                {estimate.deliveryDate 
+                {estimate.deliveryDate
                   ? estimate.deliveryDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
                   : "-"
                 }
@@ -976,9 +1186,18 @@ export default function Orcamento() {
       </Card>
 
       <div className="flex flex-col sm:flex-row gap-4">
-        <Button size="lg" className="w-full gap-2">
-          <Send className="h-4 w-4" />
-          Enviar Solicitação de Orçamento
+        <Button size="lg" className="w-full gap-2" onClick={handleSubmitBudget} disabled={isVerifyingClient}>
+          {isVerifyingClient ? (
+            <>
+              <Clock className="h-4 w-4 animate-spin" />
+              Processando...
+            </>
+          ) : (
+            <>
+              <Send className="h-4 w-4" />
+              Enviar Solicitação de Orçamento
+            </>
+          )}
         </Button>
         <Button
           variant="outline"
@@ -993,7 +1212,10 @@ export default function Orcamento() {
               features: [],
               pages: 1,
               integrations: [],
-              name: "",
+              firstName: "",
+              lastName: "",
+              document: "",
+              documentType: "cpf",
               email: "",
               phone: "",
               company: "",
@@ -1025,7 +1247,7 @@ export default function Orcamento() {
             Calcule o Investimento do seu Projeto
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Responda algumas perguntas e receba uma estimativa instantânea 
+            Responda algumas perguntas e receba uma estimativa instantânea
             para desenvolvimento do seu software, site ou aplicativo.
           </p>
         </motion.div>
@@ -1037,11 +1259,10 @@ export default function Orcamento() {
               {[1, 2, 3, 4, 5, 6].map((step) => (
                 <div key={step} className="flex items-center">
                   <div
-                    className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                      step <= budget.step
+                    className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${step <= budget.step
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     {step < budget.step ? (
                       <CheckCircle2 className="h-4 w-4" />
@@ -1051,9 +1272,8 @@ export default function Orcamento() {
                   </div>
                   {step < 6 && (
                     <div
-                      className={`w-8 md:w-16 h-0.5 mx-2 ${
-                        step < budget.step ? "bg-primary" : "bg-muted"
-                      }`}
+                      className={`w-8 md:w-16 h-0.5 mx-2 ${step < budget.step ? "bg-primary" : "bg-muted"
+                        }`}
                     />
                   )}
                 </div>
@@ -1112,12 +1332,17 @@ export default function Orcamento() {
               )}
               {budget.step === 6 && (
                 <Button
-                  onClick={handleNext}
-                  disabled={!budget.name || !budget.email}
+                  onClick={handleFinalizar}
+                  disabled={
+                    !budget.firstName || 
+                    !budget.lastName || 
+                    !budget.document || 
+                    (!budget.email && !budget.phone)
+                  }
                   className="gap-2"
                 >
-                  Calcular Orçamento
-                  <DollarSign className="h-4 w-4" />
+                  Revisar Orçamento
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               )}
             </div>

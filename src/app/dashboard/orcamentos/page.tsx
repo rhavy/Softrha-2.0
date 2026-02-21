@@ -33,8 +33,8 @@ interface Budget {
   projectType: string;
   complexity: string;
   timeline: string;
-  features: any[];
-  integrations: any[];
+  features: string | any[];
+  integrations: string | any[];
   pages: number;
   estimatedMin: number;
   estimatedMax: number;

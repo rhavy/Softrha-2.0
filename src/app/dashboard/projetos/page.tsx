@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const statusColors: Record<string, string> = {
   "Em Desenvolvimento": "bg-blue-500 text-blue-500",
@@ -44,6 +45,7 @@ const statusIcons: Record<string, React.ReactNode> = {
 };
 
 export default function DashboardProjetos() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [modalOpen, setModalOpen] = useState(false);
@@ -101,7 +103,11 @@ export default function DashboardProjetos() {
       setModalOpen(false);
     } catch (error) {
       console.error("Erro ao criar projeto:", error);
-      alert("Erro ao criar projeto: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar projeto: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -133,7 +139,11 @@ export default function DashboardProjetos() {
       setProjectToEdit(null);
     } catch (error) {
       console.error("Erro ao atualizar projeto:", error);
-      alert("Erro ao atualizar projeto: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar projeto: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -163,7 +173,11 @@ export default function DashboardProjetos() {
       setProjectToDelete(null);
     } catch (error) {
       console.error("Erro ao excluir projeto:", error);
-      alert("Erro ao excluir projeto: " + (error as any).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir projeto: " + (error as any).message,
+        variant: "destructive",
+      });
     }
   };
 
