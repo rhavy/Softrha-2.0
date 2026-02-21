@@ -87,19 +87,19 @@ export default function Home() {
             <Badge variant="secondary" className="px-4 py-2 text-sm">
               🚀 Transforme sua ideia em realidade digital
             </Badge>
-            
+
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight max-w-4xl">
               Desenvolvimento de Software de{" "}
               <span className="text-primary">Alta Performance</span>
             </h1>
-            
+
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl">
-              Especialistas em Next.js 14, TypeScript e Tailwind CSS. 
+              Especialistas em Next.js 14, TypeScript e Tailwind CSS.
               Criamos soluções digitais que impulsionam seu negócio para o próximo nível.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/contato">
+              <Link href="/orcamento">
                 <Button size="lg" className="gap-2">
                   Solicitar Orçamento
                   <ArrowRight className="h-4 w-4" />
@@ -113,7 +113,7 @@ export default function Home() {
             </div>
           </motion.div>
         </div>
-        
+
         {/* Background decoration */}
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#00000008_1px,transparent_1px),linear-gradient(to_bottom,#00000008_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
       </section>
@@ -135,7 +135,7 @@ export default function Home() {
               Soluções Completas para seu Negócio
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Do conceito à implementação, oferecemos expertise técnica completa 
+              Do conceito à implementação, oferecemos expertise técnica completa
               para transformar sua visão em produto digital.
             </p>
           </motion.div>
@@ -190,7 +190,7 @@ export default function Home() {
               Tecnologias de Ponta
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Utilizamos as ferramentas mais modernas e robustas do mercado 
+              Utilizamos as ferramentas mais modernas e robustas do mercado
               para garantir performance, segurança e escalabilidade.
             </p>
           </motion.div>
@@ -239,7 +239,7 @@ export default function Home() {
                 Excelência Técnica e Visão de Negócio
               </h2>
               <p className="text-muted-foreground">
-                Combinamos expertise técnica profunda com entendimento estratégico 
+                Combinamos expertise técnica profunda com entendimento estratégico
                 para entregar soluções que realmente fazem a diferença no seu negócio.
               </p>
               <ul className="space-y-3">
@@ -314,7 +314,7 @@ export default function Home() {
               Pronto para Transformar sua Ideia em Realidade?
             </h2>
             <p className="text-lg opacity-90">
-              Agende uma consultoria gratuita e descubra como podemos ajudar 
+              Agende uma consultoria gratuita e descubra como podemos ajudar
               a construir o software dos seus sonhos com tecnologia de ponta.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">

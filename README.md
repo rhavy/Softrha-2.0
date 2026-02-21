@@ -1,36 +1,212 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 💼 SoftRha 2.0
 
-## Getting Started
+Plataforma de desenvolvimento de software de alta performance, especializada em Next.js, TypeScript e Tailwind CSS.
 
-First, run the development server:
+## 🚀 Tecnologias
+
+- **Framework:** Next.js 16 (App Router)
+- **Linguagem:** TypeScript
+- **Estilização:** Tailwind CSS v4
+- **Componentes:** shadcn/ui + Radix UI
+- **Animações:** Framer Motion
+- **Banco de Dados:** MySQL
+- **ORM:** Prisma 6
+- **Autenticação:** Better Auth
+- **Ícones:** Lucide React
+
+## 📄 Páginas
+
+| Página | Rota | Descrição |
+|--------|------|-----------|
+| Home | `/` | Landing page com serviços e CTAs |
+| Sobre | `/sobre` | Informações da empresa |
+| Serviços | `/servicos` | Detalhamento dos serviços |
+| Orçamento | `/orcamento` | Calculadora interativa de orçamentos |
+| Contato | `/contato` | Formulário de contato |
+| Login | `/login` | Autenticação de usuários |
+| Dashboard | `/dashboard` | Área administrativa protegida |
+
+## 🛠️ Instalação
+
+### 1. Clone o repositório
+
+```bash
+git clone <repository-url>
+cd softrha-2.0
+```
+
+### 2. Instale as dependências
+
+```bash
+npm install
+```
+
+### 3. Configure o banco de dados
+
+Siga o guia em [DATABASE_SETUP.md](./DATABASE_SETUP.md) para configurar MySQL, Prisma e Better Auth.
+
+Resumo rápido:
+
+```bash
+# Copie e edite o .env
+cp .env.example .env
+
+# Gere o Prisma Client
+npx prisma generate
+
+# Execute as migrations
+npx prisma migrate dev --name init
+```
+
+### 4. Rode o projeto
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Estrutura do Projeto
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── api/                # API Routes
+│   │   ├── auth/           # Better Auth endpoints
+│   │   └── orcamento/      # API de orçamentos
+│   ├── contato/            # Página de contato
+│   ├── dashboard/          # Dashboard protegido
+│   ├── login/              # Página de login
+│   ├── orcamento/          # Calculadora de orçamento
+│   ├── servicos/           # Página de serviços
+│   ├── sobre/              # Página sobre
+│   ├── layout.tsx          # Root layout
+│   └── page.tsx            # Home page
+├── components/
+│   ├── layout/             # Header, Footer, etc.
+│   └── ui/                 # Componentes shadcn/ui
+├── hooks/                  # React Hooks (use-auth)
+├── lib/                    # Utils, Prisma, Auth config
+└── middleware.ts           # Proteção de rotas
+```
 
-## Learn More
+## 🔐 Autenticação
 
-To learn more about Next.js, take a look at the following resources:
+O sistema usa **Better Auth** com suporte a:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- ✅ Email e senha
+- ✅ Google OAuth
+- ✅ GitHub OAuth
+- ✅ Sessions persistentes
+- ✅ Middleware de proteção
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Registrar primeiro usuário
 
-## Deploy on Vercel
+Após configurar o banco, acesse `/login` e crie uma conta. O primeiro usuário pode ser promovido a admin manualmente no banco:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'seu@email.com';
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📊 Banco de Dados
+
+### Principais Modelos
+
+- **User** - Usuários e administradores
+- **Project** - Projetos dos clientes
+- **Task** - Tarefas dos projetos
+- **Budget** - Orçamentos calculados
+- **Contact** - Mensagens de contato
+- **Activity** - Log de atividades
+
+### Comandos Prisma
+
+```bash
+# Abrir Prisma Studio
+npx prisma studio
+
+# Criar nova migration
+npx prisma migrate dev --name <nome>
+
+# Resetar banco
+npx prisma migrate reset
+
+# Gerar Prisma Client
+npx prisma generate
+```
+
+## 🎨 Personalização
+
+### Tema de Cores
+
+Edite `src/app/globals.css` para alterar as variáveis de cor do tema azul:
+
+```css
+:root {
+  --primary: oklch(0.55 0.25 260);
+  /* ... outras cores */
+}
+```
+
+### Componentes UI
+
+Os componentes estão em `src/components/ui/`. Para adicionar novos:
+
+```bash
+npx shadcn-ui@latest add <componente>
+```
+
+## 🔧 Scripts
+
+```bash
+npm run dev      # Desenvolvimento
+npm run build    # Build de produção
+npm run start    # Start em produção
+npm run lint     # ESLint
+```
+
+## 📝 Variáveis de Ambiente
+
+```env
+# Banco de Dados
+DATABASE_URL="mysql://root:senha@localhost:3306/softrha"
+
+# Better Auth
+BETTER_AUTH_SECRET="sua-secret-key"
+BETTER_AUTH_URL="http://localhost:3000"
+
+# OAuth (opcional)
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+GITHUB_CLIENT_ID="..."
+GITHUB_CLIENT_SECRET="..."
+```
+
+## 🚀 Deploy
+
+### Vercel
+
+```bash
+vercel deploy
+```
+
+Lembre-se de configurar as variáveis de ambiente no painel da Vercel.
+
+### Database em Produção
+
+Use um serviço gerenciado:
+- [PlanetScale](https://planetscale.com/) (MySQL serverless)
+- [Railway](https://railway.app/)
+- [Supabase](https://supabase.com/)
+
+## 📄 Licença
+
+Este projeto é propriedade da SoftRha.
+
+## 👥 Contribuição
+
+Para contribuir, entre em contato com a equipe.
+
+---
+
+**SoftRha** - Transformando ideias em soluções digitais de alta performance.

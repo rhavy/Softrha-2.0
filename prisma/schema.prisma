@@ -1,0 +1,382 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// MODELOS DE AUTENTICAÇÃO (Better Auth)
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  password      String?
+  role          String    @default("user") // user, admin
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relações
+  accounts                Account[]
+  sessions                Session[]
+  createdProjects         Project[] // Projetos criados pelo usuário
+  budgets                 Budget[]
+  contacts                Contact[]
+  activities              Activity[]
+  assignedTasks           Task[]
+  comments                Comment[]
+  notifications           Notification[]
+  notificationPreferences UserNotificationPreference[]
+
+  @@map("users")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  expiresAt    DateTime
+  token        String   @unique
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String   @db.VarChar(1000)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@map("verifications")
+}
+
+// ============================================
+// MODELOS DE NEGÓCIO
+// ============================================
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  status      String    @default("planning") // planning, development, review, completed, cancelled
+  type        String // web, mobile, software, landing, ecommerce, dashboard
+  complexity  String // simple, medium, complex
+  timeline    String // urgent, normal, flexible
+  budget      Float?
+  clientId    String
+  clientName  String? // Nome do cliente (para projetos externos - legado)
+  createdById String? // Usuário que criou o projeto
+  tech        String? // Tecnologias (JSON array)
+  progress    Int       @default(0)
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relações
+  client     Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy  User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  tasks      Task[]
+  milestones Milestone[]
+  activities Activity[]
+
+  @@map("projects")
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("todo") // todo, in_progress, review, done
+  priority    String    @default("medium") // low, medium, high, urgent
+  projectId   String
+  assigneeId  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  // Relações
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?     @relation(fields: [assigneeId], references: [id])
+  comments Comment[]
+
+  @@map("tasks")
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("pending") // pending, in_progress, completed
+  projectId   String
+  dueDate     DateTime
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relações
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("milestones")
+}
+
+model Budget {
+  id           String   @id @default(cuid())
+  projectId    String?
+  userId       String
+  status       String   @default("pending") // pending, sent, accepted, rejected
+  projectType  String
+  complexity   String
+  timeline     String
+  features     Json // Array de features selecionadas
+  integrations Json // Array de integrações selecionadas
+  pages        Int      @default(1)
+  estimatedMin Float?
+  estimatedMax Float?
+  finalValue   Float?
+  clientName   String
+  clientEmail  String
+  clientPhone  String?
+  company      String?
+  details      String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("budgets")
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  subject   String?
+  message   String   @db.Text
+  status    String   @default("pending") // pending, contacted, resolved
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("contacts")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  type        String // project_created, task_created, task_completed, comment_added, etc.
+  description String
+  userId      String
+  projectId   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  // Relações
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@map("activities")
+}
+
+// ============================================
+// MODELOS DE EQUIPE (Dashboard)
+// ============================================
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  name      String
+  role      String
+  email     String
+  phone     String?
+  avatar    String?
+  status    String   @default("active") // active, busy, away
+  skills    String? // JSON array
+  projects  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("team_members")
+}
+
+// ============================================
+// MODELOS DE CLIENTES
+// ============================================
+
+model Client {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String
+  name         String // Nome completo (calculado)
+  documentType String   @default("cpf") // cpf ou cnpj
+  document     String   @unique
+  emails       String? // JSON: [{id, value, type, isPrimary}]
+  phones       String? // JSON: [{id, value, type, isPrimary}]
+  address      String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+  status       String   @default("active") // active, inactive
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relações
+  projects Project[]
+
+  @@map("clients")
+}
+
+// ============================================
+// MODELOS DE DOCUMENTOS (Dashboard)
+// ============================================
+
+model Document {
+  id        String   @id @default(cuid())
+  name      String
+  type      String // pdf, doc, image, sheet, etc.
+  size      String
+  folder    String
+  author    String
+  url       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("documents")
+}
+
+// ============================================
+// MODELOS DE EVENTOS/CALendário (Dashboard)
+// ============================================
+
+model Event {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  type         String // meeting, review, presentation, deploy, planning, deadline
+  date         DateTime
+  time         String
+  location     String?
+  project      String?
+  participants String? // JSON array
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("events")
+}
+
+// ============================================
+// CONFIGURAÇÕES E OUTROS
+// ============================================
+
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ============================================
+// MODELOS DE NOTIFICAÇÕES
+// ============================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String // ID do usuário que receberá a notificação
+  title     String
+  message   String   @db.Text
+  type      String   @default("info") // info, success, warning, error
+  category  String   @default("general") // general, project, client, budget, task
+  read      Boolean  @default(false)
+  link      String? // Link relacionado (ex: /dashboard/projetos/[id])
+  metadata  Json? // Dados adicionais
+  createdAt DateTime @default(now())
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
+}
+
+model UserNotificationPreference {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  emailEnabled   Boolean  @default(true)
+  pushEnabled    Boolean  @default(true)
+  projectUpdates Boolean  @default(true)
+  taskUpdates    Boolean  @default(true)
+  budgetAlerts   Boolean  @default(true)
+  clientAlerts   Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
+}

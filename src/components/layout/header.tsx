@@ -15,6 +15,8 @@ export function Header() {
     { href: "/", label: "Início" },
     { href: "/sobre", label: "Sobre" },
     { href: "/servicos", label: "Serviços" },
+    { href: "/projetos", label: "Projetos" },
+    { href: "/orcamento", label: "Orçamento" },
     { href: "/contato", label: "Contato" },
   ];
 
@@ -42,11 +44,10 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === link.href
-                    ? "text-primary"
-                    : "text-muted-foreground"
-                }`}
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === link.href
+                  ? "text-primary"
+                  : "text-muted-foreground"
+                  }`}
               >
                 {link.label}
               </Link>
@@ -59,7 +60,7 @@ export function Header() {
                 Entrar
               </Button>
             </Link>
-            <Link href="/contato">
+            <Link href="/orcamento">
               <Button size="sm">
                 Orçamento
               </Button>
@@ -94,11 +95,10 @@ export function Header() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname === link.href
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }`}
+                  className={`text-sm font-medium transition-colors hover:text-primary ${pathname === link.href
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                    }`}
                 >
                   {link.label}
                 </Link>
@@ -109,7 +109,7 @@ export function Header() {
                     Entrar
                   </Button>
                 </Link>
-                <Link href="/contato" onClick={() => setMobileMenuOpen(false)}>
+                <Link href="/orcamento" onClick={() => setMobileMenuOpen(false)}>
                   <Button size="sm" className="w-full">
                     Orçamento
                   </Button>

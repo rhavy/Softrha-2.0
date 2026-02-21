@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,17 +17,81 @@ import {
   ArrowLeft,
   Github,
   Chrome,
+  AlertCircle,
 } from "lucide-react";
+import { authClient } from "@/hooks/use-auth";
 
 export default function Login() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login attempt:", { email, password });
-    // Implementar autenticação real aqui
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await authClient.signIn.email({
+        email,
+        password,
+        callbackURL: "/dashboard",
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Erro ao fazer login");
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch (err) {
+      setError("Ocorreu um erro inesperado. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/dashboard",
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Erro ao fazer login com Google");
+      }
+    } catch (err) {
+      setError("Ocorreu um erro ao conectar com Google. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGithubSignIn = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await authClient.signIn.social({
+        provider: "github",
+        callbackURL: "/dashboard",
+      });
+
+      if (result.error) {
+        setError(result.error.message || "Erro ao fazer login com GitHub");
+      }
+    } catch (err) {
+      setError("Ocorreu um erro ao conectar com GitHub. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,6 +124,13 @@ export default function Login() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    {error}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
@@ -110,8 +182,8 @@ export default function Login() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full">
-                  Entrar
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Entrando..." : "Entrar"}
                 </Button>
               </form>
 
@@ -127,11 +199,11 @@ export default function Login() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" onClick={handleGoogleSignIn} disabled={loading}>
                   <Chrome className="h-4 w-4" />
                   Google
                 </Button>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" onClick={handleGithubSignIn} disabled={loading}>
                   <Github className="h-4 w-4" />
                   GitHub
                 </Button>
