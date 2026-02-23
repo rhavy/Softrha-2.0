@@ -43,6 +43,11 @@ interface Stats {
   sent: number;
   accepted: number;
   rejected: number;
+  userApproved: number;
+  contractSigned: number;
+  downPaymentPaid: number;
+  finalPaymentPaid: number;
+  completed: number;
   conversionRate: number;
   avgResponseTime: number;
   totalValue: number;
@@ -54,6 +59,14 @@ const statusColors: Record<string, string> = {
   sent: "bg-blue-500",
   accepted: "bg-green-500",
   rejected: "bg-red-500",
+  user_approved: "bg-emerald-500",
+  contract_sent: "bg-indigo-500",
+  contract_signed: "bg-purple-500",
+  down_payment_sent: "bg-amber-500",
+  down_payment_paid: "bg-teal-500",
+  final_payment_sent: "bg-orange-500",
+  final_payment_paid: "bg-lime-500",
+  completed: "bg-green-600",
 };
 
 const statusLabels: Record<string, string> = {
@@ -61,6 +74,14 @@ const statusLabels: Record<string, string> = {
   sent: "Enviado",
   accepted: "Aceito",
   rejected: "Rejeitado",
+  user_approved: "Aprovado pelo Cliente",
+  contract_sent: "Contrato Enviado",
+  contract_signed: "Contrato Assinado",
+  down_payment_sent: "Aguardando Entrada",
+  down_payment_paid: "Entrada Paga",
+  final_payment_sent: "Aguardando Final",
+  final_payment_paid: "Final Pago",
+  completed: "Concluído",
 };
 
 export default function RelatoriosPage() {
@@ -113,13 +134,18 @@ export default function RelatoriosPage() {
     const sent = data.filter((b) => b.status === "sent").length;
     const accepted = data.filter((b) => b.status === "accepted").length;
     const rejected = data.filter((b) => b.status === "rejected").length;
-    
+    const userApproved = data.filter((b) => b.status === "user_approved").length;
+    const contractSigned = data.filter((b) => b.status === "contract_signed").length;
+    const downPaymentPaid = data.filter((b) => b.status === "down_payment_paid").length;
+    const finalPaymentPaid = data.filter((b) => b.status === "final_payment_paid").length;
+    const completed = data.filter((b) => b.status === "completed").length;
+
     // Taxa de conversão = Aceitos / (Aceitos + Rejeitados)
     const convertedOrLost = accepted + rejected;
-    const conversionRate = convertedOrLost > 0 
-      ? (accepted / convertedOrLost) * 100 
+    const conversionRate = convertedOrLost > 0
+      ? (accepted / convertedOrLost) * 100
       : 0;
-    
+
     // Calcular tempo médio de resposta (em dias)
     const responseTimes = data
       .filter((b) => b.status !== "pending")
@@ -128,22 +154,27 @@ export default function RelatoriosPage() {
         const updated = new Date(b.updatedAt);
         return (updated.getTime() - created.getTime()) / (1000 * 3600 * 24);
       });
-    
+
     const avgResponseTime = responseTimes.length > 0
       ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
       : 0;
-    
+
     // Calcular valores
-    const acceptedBudgets = data.filter((b) => b.status === "accepted");
+    const acceptedBudgets = data.filter((b) => b.status === "accepted" || b.status === "completed");
     const totalValue = acceptedBudgets.reduce((sum, b) => sum + (b.finalValue || b.estimatedMax), 0);
     const avgTicket = acceptedBudgets.length > 0 ? totalValue / acceptedBudgets.length : 0;
-    
+
     setStats({
       total,
       pending,
       sent,
       accepted,
       rejected,
+      userApproved,
+      contractSigned,
+      downPaymentPaid,
+      finalPaymentPaid,
+      completed,
       conversionRate,
       avgResponseTime,
       totalValue,
@@ -307,12 +338,14 @@ export default function RelatoriosPage() {
         </div>
 
         {/* Status Breakdown */}
-        <div className="grid gap-4 sm:grid-cols-4 mb-8">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
           {[
             { status: "pending", label: "Pendentes", count: stats.pending, icon: Clock, color: "text-yellow-500" },
             { status: "sent", label: "Enviados", count: stats.sent, icon: FileText, color: "text-blue-500" },
             { status: "accepted", label: "Aceitos", count: stats.accepted, icon: CheckCircle2, color: "text-green-500" },
-            { status: "rejected", label: "Rejeitados", count: stats.rejected, icon: XCircle, color: "text-red-500" },
+            { status: "contract_signed", label: "Contrato", count: stats.contractSigned, icon: FileText, color: "text-purple-500" },
+            { status: "down_payment_paid", label: "Entrada Paga", count: stats.downPaymentPaid, icon: DollarSign, color: "text-teal-500" },
+            { status: "completed", label: "Concluídos", count: stats.completed, icon: CheckCircle2, color: "text-green-600" },
           ].map((item) => (
             <Card key={item.status}>
               <CardContent className="pt-6">

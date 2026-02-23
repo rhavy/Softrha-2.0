@@ -17,6 +17,7 @@ import {
   Filter,
   Edit2,
   Trash2,
+  DollarSign,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoProjetoModal } from "@/components/modals/novo-projeto-modal";
@@ -29,12 +30,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 const statusColors: Record<string, string> = {
   "Em Desenvolvimento": "bg-blue-500 text-blue-500",
   "Em Revisão": "bg-yellow-500 text-yellow-500",
   "Planejamento": "bg-gray-500 text-gray-500",
   "Concluído": "bg-green-500 text-green-500",
+  "Aguardando Pagamento": "bg-amber-500 text-amber-500",
 };
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -42,6 +45,7 @@ const statusIcons: Record<string, React.ReactNode> = {
   "Em Revisão": <AlertCircle className="h-3 w-3" />,
   "Planejamento": <Filter className="h-3 w-3" />,
   "Concluído": <CheckCircle2 className="h-3 w-3" />,
+  "Aguardando Pagamento": <DollarSign className="h-3 w-3" />,
 };
 
 export default function DashboardProjetos() {
@@ -62,12 +66,12 @@ export default function DashboardProjetos() {
       console.log("Buscando projetos...");
       const response = await fetch("/api/projetos");
       console.log("Status da resposta:", response.status);
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Erro ao buscar projetos");
       }
-      
+
       const data = await response.json();
       console.log("Projetos carregados:", data);
       setProjectsList(data);
@@ -309,104 +313,109 @@ export default function DashboardProjetos() {
         {/* Projects List */}
         <div className="grid gap-4">
           {filteredProjects.map((project, index) => (
-            <motion.div
+            <Link 
               key={project.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.1 }}
+              href={`/dashboard/projetos/${project.id}`}
             >
-              <Card className="hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-lg">{project.name}</h3>
-                        <Badge
-                          variant="secondary"
-                          className={`${statusColors[project.status]} bg-opacity-10`}
-                        >
-                          {statusIcons[project.status]}
-                          <span className="ml-1">{project.status}</span>
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3">{project.client}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.tech?.map((tech: string) => (
-                          <Badge key={tech} variant="outline" className="text-xs">
-                            {tech}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-lg">{project.name}</h3>
+                          <Badge
+                            variant="secondary"
+                            className={`${statusColors[project.status]} bg-opacity-10`}
+                          >
+                            {statusIcons[project.status]}
+                            <span className="ml-1">{project.status}</span>
                           </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-3">
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Progresso</p>
-                          <p className="text-sm font-medium">{project.progress}%</p>
                         </div>
-                        <div className="w-32">
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary transition-all"
-                              style={{ width: `${project.progress}%` }}
-                            />
+                        <p className="text-sm text-muted-foreground mb-3">{project.client}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {project.tech?.map((tech: string) => (
+                            <Badge key={tech} variant="outline" className="text-xs">
+                              {tech}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Progresso</p>
+                            <p className="text-sm font-medium">{project.progress}%</p>
+                          </div>
+                          <div className="w-32">
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            <span>Entrega: {new Date(project.dueDate).toLocaleDateString("pt-BR")}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>{project.tasks.completed}/{project.tasks.total} tarefas</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-2">
+                            {project.team?.map((member: string, i: number) => (
+                              <div
+                                key={i}
+                                className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary border-2 border-background"
+                              >
+                                {member}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditProject(project);
+                              }}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(project);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          <span>Entrega: {new Date(project.dueDate).toLocaleDateString("pt-BR")}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>{project.tasks.completed}/{project.tasks.total} tarefas</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-2">
-                          {project.team?.map((member: string, i: number) => (
-                            <div
-                              key={i}
-                              className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary border-2 border-background"
-                            >
-                              {member}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditProject(project);
-                            }}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(project);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+            </Link>
           ))}
         </div>
 
@@ -450,7 +459,7 @@ export default function DashboardProjetos() {
             <DialogHeader>
               <DialogTitle>Confirmar Exclusão</DialogTitle>
               <DialogDescription>
-                Tem certeza que deseja excluir o projeto "{projectToDelete?.name}"? 
+                Tem certeza que deseja excluir o projeto "{projectToDelete?.name}"?
                 Esta ação não pode ser desfeita e todos os dados relacionados serão excluídos.
               </DialogDescription>
             </DialogHeader>

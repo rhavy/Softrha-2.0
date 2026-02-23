@@ -432,6 +432,7 @@ export default function Orcamento() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          clientId: clientResultData.client.id,
           projectType: budget.projectType,
           complexity: budget.complexity,
           timeline: budget.timeline,

@@ -55,6 +55,14 @@ const statusLabels: Record<string, string> = {
   sent: "Enviado",
   accepted: "Aceito",
   rejected: "Rejeitado",
+  user_approved: "Aprovado pelo Cliente",
+  contract_sent: "Contrato Enviado",
+  contract_signed: "Contrato Assinado",
+  down_payment_sent: "Aguardando Entrada",
+  down_payment_paid: "Entrada Paga",
+  final_payment_sent: "Aguardando Final",
+  final_payment_paid: "Final Pago",
+  completed: "Concluído",
 };
 
 const statusColors: Record<string, string> = {
@@ -62,6 +70,14 @@ const statusColors: Record<string, string> = {
   sent: "bg-blue-500",
   accepted: "bg-green-500",
   rejected: "bg-red-500",
+  user_approved: "bg-emerald-500",
+  contract_sent: "bg-indigo-500",
+  contract_signed: "bg-purple-500",
+  down_payment_sent: "bg-amber-500",
+  down_payment_paid: "bg-teal-500",
+  final_payment_sent: "bg-orange-500",
+  final_payment_paid: "bg-lime-500",
+  completed: "bg-green-600",
 };
 
 const projectTypeLabels: Record<string, string> = {
@@ -151,6 +167,9 @@ export default function OrcamentosPage() {
     pending: budgets.filter((b) => b.status === "pending").length,
     sent: budgets.filter((b) => b.status === "sent").length,
     accepted: budgets.filter((b) => b.status === "accepted").length,
+    contractSigned: budgets.filter((b) => b.status === "contract_signed").length,
+    downPaymentPaid: budgets.filter((b) => b.status === "down_payment_paid").length,
+    completed: budgets.filter((b) => b.status === "completed").length,
   };
 
   return (
@@ -231,8 +250,8 @@ export default function OrcamentosPage() {
                   className="pl-10"
                 />
               </div>
-              <div className="flex gap-2">
-                {["todos", "pending", "sent", "accepted"].map((status) => (
+              <div className="flex gap-2 flex-wrap">
+                {["todos", "pending", "sent", "accepted", "contract_signed", "down_payment_paid", "completed"].map((status) => (
                   <Button
                     key={status}
                     variant={statusFilter === status ? "default" : "outline"}

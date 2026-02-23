@@ -96,7 +96,7 @@ model Project {
   id          String    @id @default(cuid())
   name        String
   description String?
-  status      String    @default("planning") // planning, development, review, completed, cancelled
+  status      String    @default("waiting_payment") // waiting_payment, planning, development_20, development_50, development_70, development_100, waiting_final_payment, completed, finished, cancelled
   type        String // web, mobile, software, landing, ecommerce, dashboard
   complexity  String // simple, medium, complex
   timeline    String // urgent, normal, flexible
@@ -105,7 +105,7 @@ model Project {
   clientName  String? // Nome do cliente (para projetos externos - legado)
   createdById String? // Usuário que criou o projeto
   tech        String? // Tecnologias (JSON array)
-  progress    Int       @default(0)
+  progress    Int       @default(0) // 0, 20, 50, 70, 100
   dueDate     DateTime?
   completedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -117,6 +117,9 @@ model Project {
   tasks      Task[]
   milestones Milestone[]
   activities Activity[]
+  payments   Payment[]
+  contract   Contract?
+  schedule   Schedule?
 
   @@map("projects")
 }
@@ -163,7 +166,7 @@ model Budget {
   id           String   @id @default(cuid())
   projectId    String?
   userId       String
-  status       String   @default("pending") // pending, sent, accepted, rejected
+  status       String   @default("pending") // pending, sent, accepted, rejected, user_approved, contract_sent, contract_signed, down_payment_sent, down_payment_paid, project_in_progress, final_payment_sent, final_payment_paid, completed
   projectType  String
   complexity   String
   timeline     String
@@ -178,13 +181,104 @@ model Budget {
   clientPhone  String?
   company      String?
   details      String?  @db.Text
+  
+  // Campos para justificativa de alteração/exclusão
+  changeReason Select? // motivo selecionado (obrigatório)
+  changeDescription String? @db.Text // descrição do motivo (opcional)
+  deletionReason Select? // motivo selecionado (obrigatório)
+  deletionDescription String? @db.Text // descrição do motivo (opcional)
+  
+  // Token para aprovação do cliente via link
+  approvalToken String? @unique
+  approvalTokenExpires DateTime?
+  userApprovedAt DateTime?
+  
+  // Relações
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+  contract Contract?
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Relações
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@map("budgets")
+}
+
+// Enum para motivos de alteração/exclusão
+enum Select {
+  preco_incompativel
+  prazo_incompativel
+  escopo_alterado
+  cliente_desistiu
+  cliente_sem_resposta
+  erro_interno
+  outro
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  budgetId    String
+  projectId   String?
+  amount      Float
+  type        String   // down_payment (25%), final_payment (75%), milestone
+  status      String   @default("pending") // pending, paid, cancelled, expired
+  description String?
+  stripePaymentLinkId String?
+  stripePaymentId     String?
+  paidAt    DateTime?
+  dueDate   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  budget  Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@map("payments")
+}
+
+// Modelo de Contrato
+model Contract {
+  id              String   @id @default(cuid())
+  budgetId        String   @unique
+  projectId       String?  @unique
+  documentUrl     String?  // URL do contrato armazenado
+  documentName    String?  // Nome do arquivo
+  status          String   @default("pending") // pending, sent, signed_by_client, signed, confirmed
+  sentAt          DateTime?
+  signedByClientAt DateTime?
+  signedAt        DateTime?
+  confirmed       Boolean  @default(false) // Gestor confirmou o contrato assinado
+  content         String?  @db.Text // Conteúdo do contrato em texto
+  metadata        Json?    // Dados adicionais do contrato
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relações
+  budget  Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@map("contracts")
+}
+
+// Modelo de Agendamento de Entrega
+model Schedule {
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  date            DateTime // Data do agendamento
+  time            String   // Horário do agendamento (HH:mm)
+  type            String   // video, audio
+  status          String   @default("scheduled") // scheduled, completed, cancelled, rescheduled
+  meetingLink     String?  // Link da reunião (Google Meet, Zoom, etc.)
+  notes           String?  @db.Text // Observações adicionais
+  rescheduleReason String? @db.Text // Motivo do reagendamento (se houver)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relações
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("schedules")
 }
 
 model Contact {
