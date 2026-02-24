@@ -381,7 +381,7 @@ export default function DashboardProjetos() {
   const stats = {
     total: projectsList.length,
     emDesenvolvimento: projectsList.filter(p => normalizeToGroup(p.status) === "development").length,
-    emRevisao: projectsList.filter(p => normalizeToGroup(p.status) === "review").length,
+    waitingPayment: projectsList.filter(p => normalizeToGroup(p.status) === "waiting_payment").length,
     concluido: projectsList.filter(p => normalizeToGroup(p.status) === "completed").length,
   };
 
@@ -445,28 +445,28 @@ export default function DashboardProjetos() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
+          <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Em Desenvolvimento</p>
-                  <p className="text-3xl font-bold mt-1 text-blue-600">{stats.emDesenvolvimento}</p>
+                  <p className="text-3xl font-bold mt-1 text-purple-600">{stats.emDesenvolvimento}</p>
                 </div>
-                <div className="h-12 w-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-blue-600" />
+                <div className="h-12 w-12 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-purple-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-l-4 border-l-yellow-500 shadow-sm hover:shadow-md transition-shadow">
+          <Card className="border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground font-medium">Em Revisão</p>
-                  <p className="text-3xl font-bold mt-1 text-yellow-600">{stats.emRevisao}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Aguardando Pagamento</p>
+                  <p className="text-3xl font-bold mt-1 text-amber-600">{stats.waitingPayment}</p>
                 </div>
-                <div className="h-12 w-12 rounded-lg bg-yellow-50 flex items-center justify-center">
-                  <AlertCircle className="h-6 w-6 text-yellow-600" />
+                <div className="h-12 w-12 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <DollarSign className="h-6 w-6 text-amber-600" />
                 </div>
               </div>
             </CardContent>
