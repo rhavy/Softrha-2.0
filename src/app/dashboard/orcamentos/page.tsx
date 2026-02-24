@@ -56,84 +56,84 @@ const statusConfig: Record<string, { color: string; bg: string; border: string; 
   // Status de orçamentos (fluxo completo)
   "pending": { 
     color: "text-yellow-600", 
-    bg: "bg-yellow-50", 
+    bg: "bg-yellow-100", 
     border: "border-yellow-500",
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "Pendente"
   },
   "sent": { 
     color: "text-blue-600", 
-    bg: "bg-blue-50", 
+    bg: "bg-blue-100", 
     border: "border-blue-500",
     icon: <Mail className="h-3.5 w-3.5" />,
     label: "Enviado"
   },
   "accepted": { 
     color: "text-green-600", 
-    bg: "bg-green-50", 
+    bg: "bg-green-100", 
     border: "border-green-500",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Aceito"
   },
   "rejected": { 
     color: "text-red-600", 
-    bg: "bg-red-50", 
+    bg: "bg-red-100", 
     border: "border-red-500",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Rejeitado"
   },
   "user_approved": { 
     color: "text-emerald-600", 
-    bg: "bg-emerald-50", 
+    bg: "bg-emerald-100", 
     border: "border-emerald-500",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Aprovado pelo Cliente"
   },
   "contract_sent": { 
     color: "text-indigo-600", 
-    bg: "bg-indigo-50", 
+    bg: "bg-indigo-100", 
     border: "border-indigo-500",
     icon: <FileText className="h-3.5 w-3.5" />,
     label: "Contrato Enviado"
   },
   "contract_signed": { 
     color: "text-purple-600", 
-    bg: "bg-purple-50", 
+    bg: "bg-purple-100", 
     border: "border-purple-500",
     icon: <FileText className="h-3.5 w-3.5" />,
     label: "Contrato Assinado"
   },
   "down_payment_sent": { 
     color: "text-amber-600", 
-    bg: "bg-amber-50", 
+    bg: "bg-amber-100", 
     border: "border-amber-500",
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Aguardando Entrada"
   },
   "down_payment_paid": { 
     color: "text-teal-600", 
-    bg: "bg-teal-50", 
+    bg: "bg-teal-100", 
     border: "border-teal-500",
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Entrada Paga"
   },
   "final_payment_sent": { 
     color: "text-orange-600", 
-    bg: "bg-orange-50", 
+    bg: "bg-orange-100", 
     border: "border-orange-500",
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Aguardando Final"
   },
   "final_payment_paid": { 
     color: "text-lime-600", 
-    bg: "bg-lime-50", 
+    bg: "bg-lime-100", 
     border: "border-lime-500",
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Final Pago"
   },
   "completed": { 
     color: "text-green-600", 
-    bg: "bg-green-50", 
+    bg: "bg-green-100", 
     border: "border-green-600",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Concluído"
@@ -454,8 +454,8 @@ export default function OrcamentosPage() {
                           </CardDescription>
                         </div>
                       </div>
-                      <Badge className={statusColors[budget.status]}>
-                        {statusLabels[budget.status]}
+                      <Badge className={`${statusConfig[budget.status]?.color} ${statusConfig[budget.status]?.bg}`} variant="secondary">
+                        {statusConfig[budget.status]?.label}
                       </Badge>
                     </div>
                   </CardHeader>
