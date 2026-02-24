@@ -380,9 +380,28 @@ export default function DashboardProjetos() {
 
   const stats = {
     total: projectsList.length,
-    emDesenvolvimento: projectsList.filter(p => normalizeToGroup(p.status) === "development").length,
-    waitingPayment: projectsList.filter(p => normalizeToGroup(p.status) === "waiting_payment").length,
-    concluido: projectsList.filter(p => normalizeToGroup(p.status) === "completed").length,
+    waitingPayment: projectsList.filter(p => {
+      const s = p.status === "Aguardando Pagamento" ? "waiting_payment" : p.status;
+      return s === "waiting_payment";
+    }).length,
+    planning: projectsList.filter(p => {
+      const s = p.status === "Planejamento" ? "planning" : p.status;
+      return s === "planning";
+    }).length,
+    development: projectsList.filter(p => {
+      const s = ["development", "development_20", "development_50", "development_70", "development_100", 
+                 "Em Desenvolvimento", "20% Concluído", "50% Concluído", "70% Concluído", "100% Concluído"]
+                .includes(p.status);
+      return s;
+    }).length,
+    completed: projectsList.filter(p => {
+      const s = p.status === "Concluído (Aguardando Entrega)" ? "completed" : p.status;
+      return s === "completed";
+    }).length,
+    finished: projectsList.filter(p => {
+      const s = p.status === "Finalizado (Entregue)" ? "finished" : p.status;
+      return s === "finished";
+    }).length,
   };
 
   if (loading) {
@@ -431,7 +450,7 @@ export default function DashboardProjetos() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
           <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -445,12 +464,25 @@ export default function DashboardProjetos() {
               </div>
             </CardContent>
           </Card>
+          <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Planejamento</p>
+                  <p className="text-3xl font-bold mt-1 text-blue-600">{stats.planning}</p>
+                </div>
+                <div className="h-12 w-12 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Filter className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Em Desenvolvimento</p>
-                  <p className="text-3xl font-bold mt-1 text-purple-600">{stats.emDesenvolvimento}</p>
+                  <p className="text-3xl font-bold mt-1 text-purple-600">{stats.development}</p>
                 </div>
                 <div className="h-12 w-12 rounded-lg bg-purple-50 flex items-center justify-center">
                   <Clock className="h-6 w-6 text-purple-600" />
@@ -476,10 +508,23 @@ export default function DashboardProjetos() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium">Concluídos</p>
-                  <p className="text-3xl font-bold mt-1 text-green-600">{stats.concluido}</p>
+                  <p className="text-3xl font-bold mt-1 text-green-600">{stats.completed}</p>
                 </div>
                 <div className="h-12 w-12 rounded-lg bg-green-50 flex items-center justify-center">
                   <CheckCircle2 className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-emerald-600 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Finalizados</p>
+                  <p className="text-3xl font-bold mt-1 text-emerald-600">{stats.finished}</p>
+                </div>
+                <div className="h-12 w-12 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-600" />
                 </div>
               </div>
             </CardContent>
