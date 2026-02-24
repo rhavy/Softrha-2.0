@@ -251,15 +251,62 @@ export default function DashboardProjetos() {
   const filteredProjects = projectsList.filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.client.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "todos" || project.status === statusFilter;
+    
+    // Normalizar status para comparação (suporta PT e EN)
+    const normalizeStatus = (status: string) => {
+      const statusMap: Record<string, string> = {
+        // PT → EN
+        "Em Desenvolvimento": "development",
+        "Em Revisão": "review",
+        "Planejamento": "planning",
+        "Concluído": "completed",
+        "Aguardando Pagamento": "waiting_payment",
+        // EN → PT (para garantir)
+        "development": "Em Desenvolvimento",
+        "review": "Em Revisão",
+        "planning": "Planejamento",
+        "completed": "Concluído",
+        "waiting_payment": "Aguardando Pagamento",
+      };
+      return statusMap[status] || status;
+    };
+
+    const projectStatusNormalized = normalizeStatus(project.status);
+    const filterStatusNormalized = normalizeStatus(statusFilter);
+    
+    const matchesStatus = statusFilter === "todos" || 
+      project.status === statusFilter || 
+      projectStatusNormalized === filterStatusNormalized;
+    
     return matchesSearch && matchesStatus;
   });
 
+  // Normalizar status para stats
+  const normalizeToPT = (status: string) => {
+    const map: Record<string, string> = {
+      "development": "Em Desenvolvimento",
+      "review": "Em Revisão",
+      "planning": "Planejamento",
+      "completed": "Concluído",
+      "waiting_payment": "Aguardando Pagamento",
+    };
+    return map[status] || status;
+  };
+
   const stats = {
     total: projectsList.length,
-    emDesenvolvimento: projectsList.filter(p => p.status === "Em Desenvolvimento").length,
-    emRevisao: projectsList.filter(p => p.status === "Em Revisão").length,
-    concluido: projectsList.filter(p => p.status === "Concluído").length,
+    emDesenvolvimento: projectsList.filter(p => {
+      const s = normalizeToPT(p.status);
+      return s === "Em Desenvolvimento";
+    }).length,
+    emRevisao: projectsList.filter(p => {
+      const s = normalizeToPT(p.status);
+      return s === "Em Revisão";
+    }).length,
+    concluido: projectsList.filter(p => {
+      const s = normalizeToPT(p.status);
+      return s === "Concluído";
+    }).length,
   };
 
   if (loading) {
@@ -401,7 +448,6 @@ export default function DashboardProjetos() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredProjects.map((project, index) => {
             const status = statusConfig[project.status] || statusConfig["planning"];
-            console.log(`[PROJETO] ${project.name}: status="${project.status}"`, status ? "✓ encontrado" : "✗ não encontrado");
             return (
               <Link
                 key={project.id}
