@@ -320,12 +320,12 @@ export async function POST(request: NextRequest) {
               });
 
               if (budget) {
-                // Calcular deadline corretamente
-                let deadline = null;
+                // Calcular dueDate corretamente
+                let dueDate = null;
                 if (budget.timeline) {
                   const timelineDays = parseInt(budget.timeline);
                   if (!isNaN(timelineDays)) {
-                    deadline = new Date(Date.now() + timelineDays * 24 * 60 * 60 * 1000);
+                    dueDate = new Date(Date.now() + timelineDays * 24 * 60 * 60 * 1000);
                   }
                 }
 
@@ -336,12 +336,13 @@ export async function POST(request: NextRequest) {
                     status: "planning", // Projeto começa em planejamento
                     progress: 0,
                     budget: budget.finalValue || 0,
-                    deadline,
-                    features: budget.features || {},
-                    integrations: budget.integrations || {},
-                    projectType: budget.projectType,
-                    complexity: budget.complexity,
-                    userId: budget.userId,
+                    dueDate,
+                    type: budget.projectType || "web",
+                    complexity: budget.complexity || "medium",
+                    timeline: budget.timeline || "normal",
+                    tech: null,
+                    clientId: budget.userId,
+                    createdById: budget.userId,
                   },
                 });
 

@@ -67,6 +67,8 @@ export async function GET(request: NextRequest) {
         status: frontendStatusMap[project.status] || project.status,
         progress: project.progress,
         dueDate: project.dueDate?.toISOString() || null,
+        startDate: project.startDate?.toISOString() || null,
+        budget: project.budget,
         tasks: {
           total: project.tasks.length,
           completed: completedTasks,

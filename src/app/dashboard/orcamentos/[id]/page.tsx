@@ -81,6 +81,7 @@ interface Budget {
   userId: string;
   createdAt: string;
   updatedAt: string;
+  startDate?: string | null;
   changeReason?: string;
   changeDescription?: string;
   deletionReason?: string;
@@ -147,6 +148,18 @@ export default function OrcamentoDetalhesPage() {
   // Edição de valor
   const [editFinalValue, setEditFinalValue] = useState<string>("");
   const [editTimeline, setEditTimeline] = useState<string>("");
+  const [editStartDate, setEditStartDate] = useState<string>("");
+  const [formattedBudget, setFormattedBudget] = useState<string>("");
+
+  // Converter timeline para semanas
+  const getTimelineInWeeks = (timeline: string): string => {
+    const timelineMap: Record<string, string> = {
+      urgent: "1-2 semanas",
+      normal: "3-6 semanas",
+      flexible: "6+ semanas",
+    };
+    return timelineMap[timeline] || timeline;
+  };
 
   // Justificativas
   const [changeReason, setChangeReason] = useState("");
@@ -275,8 +288,8 @@ export default function OrcamentoDetalhesPage() {
 
   const handleEditValue = async () => {
     try {
-      const finalValue = parseFloat(editFinalValue.replace(",", "."));
-      
+      const finalValue = parseFloat(editFinalValue.replace(".", "").replace(",", "."));
+
       if (isNaN(finalValue) || finalValue <= 0) {
         toast({
           title: "Valor inválido",
@@ -286,13 +299,20 @@ export default function OrcamentoDetalhesPage() {
         return;
       }
 
+      const updateData: any = {
+        finalValue,
+        timeline: editTimeline,
+      };
+
+      // Adicionar data de início se fornecida
+      if (editStartDate) {
+        updateData.startDate = new Date(editStartDate).toISOString();
+      }
+
       const response = await fetch(`/api/orcamentos/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          finalValue,
-          timeline: editTimeline,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       if (!response.ok) throw new Error("Erro ao atualizar orçamento");
@@ -306,6 +326,8 @@ export default function OrcamentoDetalhesPage() {
       setIsEditValueDialogOpen(false);
       setEditFinalValue("");
       setEditTimeline("");
+      setEditStartDate("");
+      setFormattedBudget("");
       fetchBudget();
     } catch (error) {
       toast({
@@ -314,6 +336,27 @@ export default function OrcamentoDetalhesPage() {
         variant: "destructive",
       });
     }
+  };
+
+  // Formatar valor para moeda brasileira (R$)
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  };
+
+  // Converter string formatada para número
+  const parseCurrency = (value: string): number => {
+    return parseFloat(value.replace(/\D/g, "")) / 100;
+  };
+
+  // Formatar input de moeda
+  const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericValue = parseCurrency(value);
+    setFormattedBudget(formatCurrency(numericValue));
+    setEditFinalValue(numericValue.toString());
   };
 
   const handleGeneratePaymentLink = async () => {
@@ -575,8 +618,20 @@ export default function OrcamentoDetalhesPage() {
                     <Send className="h-4 w-4 mr-1" />Enviar Proposta
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => {
-                    setEditFinalValue(budget.finalValue?.toString() || "");
+                    const budgetValue = budget.finalValue || 0;
+                    setEditFinalValue(budgetValue.toString());
+                    setFormattedBudget(formatCurrency(budgetValue));
                     setEditTimeline(budget.timeline || "");
+                    // Formatar data de início se existir (YYYY-MM-DD)
+                    if (budget.startDate) {
+                      const d = new Date(budget.startDate);
+                      const year = d.getFullYear();
+                      const month = String(d.getMonth() + 1).padStart(2, "0");
+                      const day = String(d.getDate()).padStart(2, "0");
+                      setEditStartDate(`${year}-${month}-${day}`);
+                    } else {
+                      setEditStartDate("");
+                    }
                     setIsEditValueDialogOpen(true);
                   }}>
                     <Edit2 className="h-4 w-4 mr-1" />Alterar Valor/Prazo
@@ -744,7 +799,7 @@ export default function OrcamentoDetalhesPage() {
             <CardDescription>Visão geral dos valores e condições do orçamento</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Faixa de Valor Estimado</p>
                 <div className="flex items-center gap-2">
@@ -764,6 +819,15 @@ export default function OrcamentoDetalhesPage() {
                   <DollarSign className="h-4 w-4 text-green-600" />
                   <span className="text-xl font-bold text-green-600">
                     {budget.finalValue ? `R$ ${budget.finalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "A negociar"}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Data de Início</p>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-amber-600" />
+                  <span className="text-lg font-semibold">
+                    {budget.startDate ? new Date(budget.startDate).toLocaleDateString("pt-BR") : "—"}
                   </span>
                 </div>
               </div>
@@ -935,14 +999,45 @@ export default function OrcamentoDetalhesPage() {
                   <Calendar className="h-5 w-5" />Timeline
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Criado em</p>
-                  <p className="font-medium">{new Date(budget.createdAt).toLocaleDateString("pt-BR")}</p>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                  <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <Rocket className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-green-700 font-medium">Data de Início do Projeto</p>
+                    <p className="text-base font-semibold text-green-900">{budget.startDate ? new Date(budget.startDate).toLocaleDateString("pt-BR") : "—"}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Atualizado em</p>
-                  <p className="font-medium">{new Date(budget.updatedAt).toLocaleDateString("pt-BR")}</p>
+                <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-amber-700 font-medium">Prazo de Entrega</p>
+                    <p className="text-base font-semibold text-amber-900">{budget.timeline ? getTimelineInWeeks(budget.timeline) : "—"}</p>
+                  </div>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-start gap-2">
+                    <div className="h-6 w-6 rounded bg-blue-50 flex items-center justify-center flex-shrink-0">
+                      <Calendar className="h-3 w-3 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Criado em</p>
+                      <p className="text-sm font-medium">{new Date(budget.createdAt).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="h-6 w-6 rounded bg-purple-50 flex items-center justify-center flex-shrink-0">
+                      <Edit2 className="h-3 w-3 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Atualizado em</p>
+                      <p className="text-sm font-medium">{new Date(budget.updatedAt).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1033,20 +1128,25 @@ export default function OrcamentoDetalhesPage() {
                 Alterar Valor e Prazo
               </DialogTitle>
               <DialogDescription>
-                Edite o valor final e o prazo de entrega do orçamento
+                Edite o valor final, prazo de entrega e data de início do orçamento
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="finalValue">Valor Final (R$) *</Label>
-                <Input
-                  id="finalValue"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={editFinalValue}
-                  onChange={(e) => setEditFinalValue(e.target.value)}
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                    R$
+                  </span>
+                  <Input
+                    id="finalValue"
+                    type="text"
+                    placeholder="0,00"
+                    className="pl-10"
+                    value={formattedBudget}
+                    onChange={handleBudgetChange}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Valor mínimo: R$ {budget.estimatedMin?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </p>
@@ -1064,19 +1164,31 @@ export default function OrcamentoDetalhesPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Data de Início do Projeto</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Data prevista para início do projeto (opcional)
+                </p>
+              </div>
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800 font-medium">Condições de Pagamento</p>
                 <div className="mt-2 space-y-1 text-sm text-blue-700">
                   <div className="flex justify-between">
                     <span>Entrada (25%):</span>
                     <span className="font-medium">
-                      {editFinalValue ? `R$ ${(parseFloat(editFinalValue.replace(",", ".")) * 0.25).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                      {editFinalValue ? `R$ ${(parseFloat(editFinalValue) * 0.25).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Final (75%):</span>
                     <span className="font-medium">
-                      {editFinalValue ? `R$ ${(parseFloat(editFinalValue.replace(",", ".")) * 0.75).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                      {editFinalValue ? `R$ ${(parseFloat(editFinalValue) * 0.75).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
                     </span>
                   </div>
                 </div>

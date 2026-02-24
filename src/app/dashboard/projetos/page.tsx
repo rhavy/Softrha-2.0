@@ -18,9 +18,11 @@ import {
   RefreshCcw,
   Trash2,
   XCircle,
+  Edit,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoProjetoModal } from "@/components/modals/novo-projeto-modal";
+import { EditarProjetoPendenteModal } from "@/components/modals/editar-projeto-pendente-modal";
 import { useRealTimeUpdates } from "@/hooks/use-real-time-updates";
 import {
   Dialog,
@@ -162,6 +164,8 @@ export default function DashboardProjetos() {
   const [projectToDelete, setProjectToDelete] = useState<any>(null);
   const [projectsList, setProjectsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendenteModalOpen, setPendenteModalOpen] = useState(false);
+  const [projectToEditPendente, setProjectToEditPendente] = useState<any>(null);
 
   // Hook de atualizações em tempo real
   const { refresh, hasUpdates } = useRealTimeUpdates("projetos", {
@@ -236,6 +240,59 @@ export default function DashboardProjetos() {
   const handleEditProject = (project: any) => {
     setProjectToEdit(project);
     setModalOpen(true);
+  };
+
+  const handleEditPendenteProject = (project: any) => {
+    setProjectToEditPendente(project);
+    setPendenteModalOpen(true);
+  };
+
+  const handleUpdatePendenteProject = async (data: any) => {
+    if (!projectToEditPendente?.id) return;
+
+    try {
+      console.log("Atualizando projeto pendente:", projectToEditPendente.id, data);
+      
+      // Converter datas para formato ISO
+      const updateData: any = {};
+      
+      if (data.budget !== undefined) {
+        updateData.budget = parseFloat(data.budget);
+      }
+      
+      if (data.dueDate) {
+        updateData.dueDate = new Date(data.dueDate).toISOString();
+      }
+      
+      if (data.startDate) {
+        // Se houver campo startDate no banco, senão podemos usar um campo personalizado
+        updateData.startDate = new Date(data.startDate).toISOString();
+      }
+      
+      const response = await fetch(`/api/projetos/${projectToEditPendente.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+
+      const responseData = await response.json();
+      console.log("Resposta da atualização:", responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Erro ao atualizar projeto");
+      }
+
+      await fetchProjects();
+      setPendenteModalOpen(false);
+      setProjectToEditPendente(null);
+    } catch (error) {
+      console.error("Erro ao atualizar projeto pendente:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar projeto: " + (error as any).message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleUpdateProject = async (data: any) => {
@@ -577,100 +634,122 @@ export default function DashboardProjetos() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredProjects.map((project, index) => {
             const status = statusConfig[project.status] || statusConfig["planning"];
+            const isPendente = project.status === "waiting_payment" || project.status === "Aguardando Pagamento" || status?.label === "Aguardando Pagamento";
+            
             return (
-              <Link
-                key={project.id}
-                href={`/dashboard/projetos/${project.id}`}
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              <div key={project.id} className="relative">
+                <Link
+                  href={`/dashboard/projetos/${project.id}`}
                 >
-                  <Card className="h-full overflow-hidden hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
-                    {/* Card Header with Status */}
-                    <div className={`${status.bg} px-4 py-3 border-b`}>
-                      <div className="flex items-center justify-between">
-                        <div className={`flex items-center gap-2 ${status.color} font-semibold text-sm`}>
-                          {status.icon}
-                          <span>{status.label}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground font-medium">
-                          {new Date(project.dueDate).toLocaleDateString("pt-BR")}
-                        </div>
-                      </div>
-                    </div>
-
-                    <CardContent className="pt-4 pb-4">
-                      {/* Project Name & Client */}
-                      <div className="mb-4">
-                        <h3 className="font-bold text-lg mb-1 line-clamp-1">{project.name}</h3>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <FolderKanban className="h-3.5 w-3.5" />
-                          {project.client}
-                        </p>
-                      </div>
-
-                      {/* Tech Stack */}
-                      <div className="flex flex-wrap gap-1.5 mb-4 min-h-[32px]">
-                        {project.tech?.slice(0, 4).map((tech: string, i: number) => (
-                          <Badge
-                            key={tech}
-                            variant="secondary"
-                            className="text-xs font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
-                          >
-                            {tech}
-                          </Badge>
-                        ))}
-                        {project.tech?.length > 4 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{project.tech.length - 4}
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-muted-foreground">Progresso</span>
-                          <span className="text-xs font-bold">{project.progress}%</span>
-                        </div>
-                        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500"
-                            style={{ width: `${project.progress}%` }}
-                          />
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                  >
+                    <Card className="h-full overflow-hidden hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
+                      {/* Card Header with Status */}
+                      <div className={`${status.bg} px-4 py-3 border-b`}>
+                        <div className="flex items-center justify-between">
+                          <div className={`flex items-center gap-2 ${status.color} font-semibold text-sm`}>
+                            {status.icon}
+                            <span>{status.label}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground font-medium">
+                            {new Date(project.dueDate).toLocaleDateString("pt-BR")}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Tasks & Team */}
-                      <div className="flex items-center justify-between pt-3 border-t">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          <span className="font-medium">{project.tasks?.completed || 0}/{project.tasks?.total || 0} tarefas</span>
+                      <CardContent className="pt-4 pb-4">
+                        {/* Project Name & Client */}
+                        <div className="mb-4">
+                          <h3 className="font-bold text-lg mb-1 line-clamp-1">{project.name}</h3>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <FolderKanban className="h-3.5 w-3.5" />
+                            {project.client}
+                          </p>
                         </div>
-                        <div className="flex -space-x-2">
-                          {project.team?.slice(0, 3).map((member: string, i: number) => (
-                            <div
-                              key={i}
-                              className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center text-xs font-bold text-white border-2 border-white shadow-sm"
-                              title={member}
+
+                        {/* Tech Stack */}
+                        <div className="flex flex-wrap gap-1.5 mb-4 min-h-[32px]">
+                          {project.tech?.slice(0, 4).map((tech: string, i: number) => (
+                            <Badge
+                              key={tech}
+                              variant="secondary"
+                              className="text-xs font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
                             >
-                              {member.charAt(0).toUpperCase()}
-                            </div>
+                              {tech}
+                            </Badge>
                           ))}
-                          {project.team?.length > 3 && (
-                            <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 border-2 border-white">
-                              +{project.team.length - 3}
-                            </div>
+                          {project.tech?.length > 4 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{project.tech.length - 4}
+                            </Badge>
                           )}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </Link>
+
+                        {/* Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-muted-foreground">Progresso</span>
+                            <span className="text-xs font-bold">{project.progress}%</span>
+                          </div>
+                          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500"
+                              style={{ width: `${project.progress}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Tasks & Team */}
+                        <div className="flex items-center justify-between pt-3 border-t">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <span className="font-medium">{project.tasks?.completed || 0}/{project.tasks?.total || 0} tarefas</span>
+                          </div>
+                          <div className="flex -space-x-2">
+                            {project.team?.slice(0, 3).map((member: string, i: number) => (
+                              <div
+                                key={i}
+                                className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center text-xs font-bold text-white border-2 border-white shadow-sm"
+                                title={member}
+                              >
+                                {member.charAt(0).toUpperCase()}
+                              </div>
+                            ))}
+                            {project.team?.length > 3 && (
+                              <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 border-2 border-white">
+                                +{project.team.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </Link>
+                
+                {/* Botão Alterar para projetos Pendentes */}
+                {isPendente && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8 px-3 shadow-md"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleEditPendenteProject(project);
+                      }}
+                    >
+                      <Edit className="h-3.5 w-3.5 mr-1" />
+                      Alterar
+                    </Button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -714,6 +793,17 @@ export default function DashboardProjetos() {
           }}
           onSubmit={projectToEdit ? handleUpdateProject : handleNewProject}
           projectToEdit={projectToEdit}
+        />
+
+        {/* Modal para editar projeto pendente */}
+        <EditarProjetoPendenteModal
+          open={pendenteModalOpen}
+          onOpenChange={(open) => {
+            setPendenteModalOpen(open);
+            if (!open) setProjectToEditPendente(null);
+          }}
+          onSubmit={handleUpdatePendenteProject}
+          projectToEdit={projectToEditPendente}
         />
 
         {/* Delete Confirmation Dialog */}

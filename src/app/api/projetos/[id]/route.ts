@@ -47,7 +47,7 @@ export async function GET(
       try {
         const parsedEmails = clientData.emails ? JSON.parse(clientData.emails) : [];
         const parsedPhones = clientData.phones ? JSON.parse(clientData.phones) : [];
-        
+
         clientData = {
           ...clientData,
           emails: parsedEmails,
@@ -67,6 +67,55 @@ export async function GET(
     console.error("Erro ao buscar projeto:", error);
     return NextResponse.json(
       { error: "Erro ao buscar projeto" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Atualizar projeto
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    const updateData: any = {};
+
+    // Mapear campos permitidos
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.budget !== undefined) updateData.budget = parseFloat(body.budget);
+    if (body.dueDate !== undefined) {
+      updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+    }
+    if (body.startDate !== undefined) {
+      updateData.startDate = body.startDate ? new Date(body.startDate) : null;
+    }
+    if (body.progress !== undefined) updateData.progress = parseInt(body.progress);
+    if (body.tech !== undefined) {
+      updateData.tech = Array.isArray(body.tech) ? JSON.stringify(body.tech) : body.tech;
+    }
+
+    const project = await prisma.project.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      id: project.id,
+      name: project.name,
+      status: project.status,
+      budget: project.budget,
+      dueDate: project.dueDate?.toISOString(),
+      startDate: project.startDate?.toISOString(),
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar projeto:", error);
+    return NextResponse.json(
+      { error: "Erro ao atualizar projeto: " + (error as any).message },
       { status: 500 }
     );
   }

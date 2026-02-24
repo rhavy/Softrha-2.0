@@ -107,6 +107,7 @@ model Project {
   tech        String? // Tecnologias (JSON array)
   progress    Int       @default(0) // 0, 20, 50, 70, 100
   dueDate     DateTime?
+  startDate   DateTime? // Data de início do projeto
   completedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -192,7 +193,8 @@ model Budget {
   approvalToken String? @unique
   approvalTokenExpires DateTime?
   userApprovedAt DateTime?
-  
+  startDate  DateTime? // Data de início do projeto
+
   // Relações
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments Payment[]
