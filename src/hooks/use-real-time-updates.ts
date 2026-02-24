@@ -15,7 +15,7 @@ interface UseRealTimeUpdatesReturn {
 
 /**
  * Hook para verificação de atualizações em tempo real
- * 
+ *
  * @param pageType - Tipo da página: 'clientes', 'orcamentos', 'projetos'
  * @param options - Opções de configuração
  */
@@ -34,6 +34,71 @@ export function useRealTimeUpdates(
   const lastResourceHashRef = useRef<string>("");
   const lastUpdateRef = useRef<Date | null>(null);
   const hasUpdatesRef = useRef(false);
+
+  // Função genérica para verificar endpoint (definida primeiro para evitar hoisting)
+  const checkResourceForEndpoint = useCallback(async (endpoint: string, resourceType: string) => {
+    try {
+      const response = await fetch(endpoint, {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      let hashExtractor: (data: any) => string;
+
+      if (resourceType === "clientes") {
+        hashExtractor = (d: any) => {
+          const sorted = [...(d || [])].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          return JSON.stringify({
+            count: sorted.length,
+            lastUpdate: sorted[0]?.updatedAt,
+            ids: sorted.slice(0, 10).map((c: any) => c.id).join(","),
+          });
+        };
+      } else if (resourceType === "orcamentos") {
+        hashExtractor = (d: any) => {
+          const sorted = [...(d || [])].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          return JSON.stringify({
+            count: sorted.length,
+            lastUpdate: sorted[0]?.updatedAt,
+            statuses: sorted.map((b: any) => `${b.id}:${b.status}`).join("|"),
+          });
+        };
+      } else if (resourceType === "projetos") {
+        hashExtractor = (d: any) => {
+          const sorted = [...(d || [])].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          return JSON.stringify({
+            count: sorted.length,
+            lastUpdate: sorted[0]?.updatedAt,
+            statuses: sorted.map((p: any) => `${p.id}:${p.status}`).join("|"),
+          });
+        };
+      } else {
+        return;
+      }
+
+      const currentHash = hashExtractor(data);
+
+      if (currentHash !== lastResourceHashRef.current) {
+        console.log(`[REAL-TIME] 📊 ${resourceType} atualizados na página: ${pageType}`);
+        lastResourceHashRef.current = currentHash;
+        hasUpdatesRef.current = true;
+        lastUpdateRef.current = new Date();
+        onResourceUpdate?.({ type: resourceType, data });
+      }
+    } catch (error) {
+      console.error(`[REAL-TIME] Erro ao verificar ${resourceType}:`, error);
+    }
+  }, [pageType, onResourceUpdate]);
 
   // Verificar atualizações nas notificações
   const checkNotifications = useCallback(async () => {
@@ -67,49 +132,18 @@ export function useRealTimeUpdates(
   const checkResource = useCallback(async () => {
     try {
       let endpoint = "";
-      let hashExtractor: (data: any) => string;
 
       switch (pageType) {
         case "clientes":
           endpoint = "/api/clientes?limit=100";
-          hashExtractor = (data) => {
-            const sorted = [...(data || [])].sort((a, b) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
-            return JSON.stringify({
-              count: sorted.length,
-              lastUpdate: sorted[0]?.updatedAt,
-              ids: sorted.slice(0, 10).map((c: any) => c.id).join(","),
-            });
-          };
           break;
 
         case "orcamentos":
           endpoint = "/api/orcamentos";
-          hashExtractor = (data) => {
-            const sorted = [...(data || [])].sort((a, b) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
-            return JSON.stringify({
-              count: sorted.length,
-              lastUpdate: sorted[0]?.updatedAt,
-              statuses: sorted.map((b: any) => `${b.id}:${b.status}`).join("|"),
-            });
-          };
           break;
 
         case "projetos":
           endpoint = "/api/projetos";
-          hashExtractor = (data) => {
-            const sorted = [...(data || [])].sort((a, b) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
-            return JSON.stringify({
-              count: sorted.length,
-              lastUpdate: sorted[0]?.updatedAt,
-              statuses: sorted.map((p: any) => `${p.id}:${p.status}`).join("|"),
-            });
-          };
           break;
 
         case "dashboard":
@@ -131,72 +165,7 @@ export function useRealTimeUpdates(
     } catch (error) {
       console.error("[REAL-TIME] Erro ao verificar recurso:", error);
     }
-  }, [pageType, checkResourceForEndpoint, onResourceUpdate]);
-
-  // Função genérica para verificar endpoint
-  const checkResourceForEndpoint = useCallback(async (endpoint: string, resourceType: string) => {
-    try {
-      const response = await fetch(endpoint, {
-        credentials: "include",
-        cache: "no-store",
-      });
-
-      if (!response.ok) return;
-
-      const data = await response.json();
-      
-      let hashExtractor: (data: any) => string;
-      
-      if (resourceType === "clientes") {
-        hashExtractor = (d: any) => {
-          const sorted = [...(d || [])].sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          return JSON.stringify({
-            count: sorted.length,
-            lastUpdate: sorted[0]?.updatedAt,
-            ids: sorted.slice(0, 10).map((c: any) => c.id).join(","),
-          });
-        };
-      } else if (resourceType === "orcamentos") {
-        hashExtractor = (d: any) => {
-          const sorted = [...(d || [])].sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          return JSON.stringify({
-            count: sorted.length,
-            lastUpdate: sorted[0]?.updatedAt,
-            statuses: sorted.map((b: any) => `${b.id}:${b.status}`).join("|"),
-          });
-        };
-      } else if (resourceType === "projetos") {
-        hashExtractor = (d: any) => {
-          const sorted = [...(d || [])].sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          return JSON.stringify({
-            count: sorted.length,
-            lastUpdate: sorted[0]?.updatedAt,
-            statuses: sorted.map((p: any) => `${p.id}:${p.status}`).join("|"),
-          });
-        };
-      } else {
-        return;
-      }
-
-      const currentHash = hashExtractor(data);
-      
-      if (currentHash !== lastResourceHashRef.current) {
-        console.log(`[REAL-TIME] 📊 ${resourceType} atualizados na página: ${pageType}`);
-        lastResourceHashRef.current = currentHash;
-        hasUpdatesRef.current = true;
-        lastUpdateRef.current = new Date();
-        onResourceUpdate?.({ type: resourceType, data });
-      }
-    } catch (error) {
-      console.error(`[REAL-TIME] Erro ao verificar ${resourceType}:`, error);
-    }
-  }, [pageType, onResourceUpdate]);
+  }, [pageType, checkResourceForEndpoint]);
 
   // Refresh manual
   const refresh = useCallback(async () => {
