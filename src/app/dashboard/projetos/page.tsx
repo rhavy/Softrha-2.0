@@ -17,6 +17,7 @@ import {
   DollarSign,
   RefreshCcw,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoProjetoModal } from "@/components/modals/novo-projeto-modal";
@@ -33,7 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  // Status em português (frontend)
+  // Status principais (usados na lista)
   "Em Desenvolvimento": { 
     color: "text-blue-600", 
     bg: "bg-blue-50", 
@@ -47,8 +48,8 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Reac
     label: "Em Revisão"
   },
   "Planejamento": { 
-    color: "text-gray-600", 
-    bg: "bg-gray-50", 
+    color: "text-blue-600", 
+    bg: "bg-blue-50", 
     icon: <Filter className="h-3.5 w-3.5" />,
     label: "Planejamento"
   },
@@ -64,36 +65,78 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Reac
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Aguardando Pagamento"
   },
-  // Status em inglês (banco de dados - fallback)
+  // Status em inglês (banco de dados - referência: projetos/[id])
+  "waiting_payment": { 
+    color: "text-amber-600", 
+    bg: "bg-amber-50", 
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Aguardando Pagamento"
+  },
+  "planning": { 
+    color: "text-blue-600", 
+    bg: "bg-blue-50", 
+    icon: <Filter className="h-3.5 w-3.5" />,
+    label: "Planejamento"
+  },
   "development": { 
     color: "text-blue-600", 
     bg: "bg-blue-50", 
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "Em Desenvolvimento"
   },
-  "review": { 
-    color: "text-yellow-600", 
-    bg: "bg-yellow-50", 
-    icon: <AlertCircle className="h-3.5 w-3.5" />,
-    label: "Em Revisão"
+  "development_20": { 
+    color: "text-blue-600", 
+    bg: "bg-blue-50", 
+    icon: <Clock className="h-3.5 w-3.5" />,
+    label: "20% Concluído"
   },
-  "planning": { 
-    color: "text-gray-600", 
-    bg: "bg-gray-50", 
-    icon: <Filter className="h-3.5 w-3.5" />,
-    label: "Planejamento"
+  "development_50": { 
+    color: "text-blue-600", 
+    bg: "bg-blue-50", 
+    icon: <Clock className="h-3.5 w-3.5" />,
+    label: "50% Concluído"
+  },
+  "development_70": { 
+    color: "text-purple-600", 
+    bg: "bg-purple-50", 
+    icon: <Clock className="h-3.5 w-3.5" />,
+    label: "70% Concluído"
+  },
+  "development_100": { 
+    color: "text-green-600", 
+    bg: "bg-green-50", 
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "100% Concluído"
+  },
+  "waiting_final_payment": { 
+    color: "text-amber-600", 
+    bg: "bg-amber-50", 
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Aguardando Pagamento Final"
   },
   "completed": { 
     color: "text-green-600", 
     bg: "bg-green-50", 
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-    label: "Concluído"
+    label: "Concluído (Aguardando Entrega)"
   },
-  "waiting_payment": { 
-    color: "text-amber-600", 
-    bg: "bg-amber-50", 
-    icon: <DollarSign className="h-3.5 w-3.5" />,
-    label: "Aguardando Pagamento"
+  "finished": { 
+    color: "text-emerald-600", 
+    bg: "bg-emerald-50", 
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Finalizado (Entregue)"
+  },
+  "cancelled": { 
+    color: "text-red-600", 
+    bg: "bg-red-50", 
+    icon: <XCircle className="h-3.5 w-3.5" />,
+    label: "Cancelado"
+  },
+  "review": { 
+    color: "text-yellow-600", 
+    bg: "bg-yellow-50", 
+    icon: <AlertCircle className="h-3.5 w-3.5" />,
+    label: "Em Revisão"
   },
 };
 
@@ -252,21 +295,35 @@ export default function DashboardProjetos() {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.client.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Normalizar status para comparação (suporta PT e EN)
+    // Normalizar status para comparação (suporta todos os status do sistema)
     const normalizeStatus = (status: string) => {
+      // Status que são variações de desenvolvimento
+      if (status?.startsWith("development")) return "development";
+      if (status?.startsWith("Em Desenvolvimento")) return "development";
+      
       const statusMap: Record<string, string> = {
-        // PT → EN
+        // PT → Normalizado
         "Em Desenvolvimento": "development",
         "Em Revisão": "review",
         "Planejamento": "planning",
         "Concluído": "completed",
         "Aguardando Pagamento": "waiting_payment",
-        // EN → PT (para garantir)
-        "development": "Em Desenvolvimento",
-        "review": "Em Revisão",
-        "planning": "Planejamento",
-        "completed": "Concluído",
-        "waiting_payment": "Aguardando Pagamento",
+        "Aguardando Pagamento Final": "waiting_final_payment",
+        "Finalizado": "finished",
+        "Cancelado": "cancelled",
+        // EN → Normalizado
+        "waiting_payment": "waiting_payment",
+        "planning": "planning",
+        "development": "development",
+        "development_20": "development",
+        "development_50": "development",
+        "development_70": "development",
+        "development_100": "development",
+        "waiting_final_payment": "waiting_final_payment",
+        "completed": "completed",
+        "finished": "finished",
+        "cancelled": "cancelled",
+        "review": "review",
       };
       return statusMap[status] || status;
     };
@@ -281,32 +338,32 @@ export default function DashboardProjetos() {
     return matchesSearch && matchesStatus;
   });
 
-  // Normalizar status para stats
-  const normalizeToPT = (status: string) => {
+  // Normalizar status para stats (agrupar desenvolvimento)
+  const normalizeToGroup = (status: string) => {
+    if (status?.startsWith("development") || status?.startsWith("Em Desenvolvimento")) {
+      return "development";
+    }
     const map: Record<string, string> = {
-      "development": "Em Desenvolvimento",
-      "review": "Em Revisão",
-      "planning": "Planejamento",
-      "completed": "Concluído",
-      "waiting_payment": "Aguardando Pagamento",
+      "waiting_payment": "waiting_payment",
+      "planning": "planning",
+      "waiting_final_payment": "waiting_final_payment",
+      "completed": "completed",
+      "finished": "finished",
+      "cancelled": "cancelled",
+      "review": "review",
+      "Em Revisão": "review",
+      "Concluído": "completed",
+      "Planejamento": "planning",
+      "Aguardando Pagamento": "waiting_payment",
     };
     return map[status] || status;
   };
 
   const stats = {
     total: projectsList.length,
-    emDesenvolvimento: projectsList.filter(p => {
-      const s = normalizeToPT(p.status);
-      return s === "Em Desenvolvimento";
-    }).length,
-    emRevisao: projectsList.filter(p => {
-      const s = normalizeToPT(p.status);
-      return s === "Em Revisão";
-    }).length,
-    concluido: projectsList.filter(p => {
-      const s = normalizeToPT(p.status);
-      return s === "Concluído";
-    }).length,
+    emDesenvolvimento: projectsList.filter(p => normalizeToGroup(p.status) === "development").length,
+    emRevisao: projectsList.filter(p => normalizeToGroup(p.status) === "review").length,
+    concluido: projectsList.filter(p => normalizeToGroup(p.status) === "completed").length,
   };
 
   if (loading) {
@@ -424,18 +481,26 @@ export default function DashboardProjetos() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                {["todos", "Em Desenvolvimento", "Em Revisão", "Concluído", "Planejamento"].map((status) => {
-                  const config = statusConfig[status];
+                {["todos", "planning", "development", "review", "completed", "waiting_payment"].map((statusKey) => {
+                  const config = statusConfig[statusKey];
+                  const labelMap: Record<string, string> = {
+                    "todos": "Todos",
+                    "planning": "Planejamento",
+                    "development": "Em Desenvolvimento",
+                    "review": "Em Revisão",
+                    "completed": "Concluído",
+                    "waiting_payment": "Aguardando Pagamento",
+                  };
                   return (
                     <Button
-                      key={status}
-                      variant={statusFilter === status ? "default" : "outline"}
+                      key={statusKey}
+                      variant={statusFilter === statusKey ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setStatusFilter(status)}
-                      className={statusFilter === status ? "" : "hover:bg-gray-50"}
+                      onClick={() => setStatusFilter(statusKey)}
+                      className={statusFilter === statusKey ? "" : "hover:bg-gray-50"}
                     >
                       {config?.icon}
-                      <span className="ml-1.5">{status === "todos" ? "Todos" : status}</span>
+                      <span className="ml-1.5">{labelMap[statusKey]}</span>
                     </Button>
                   );
                 })}
