@@ -16,6 +16,7 @@ import {
   Filter,
   DollarSign,
   RefreshCcw,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoProjetoModal } from "@/components/modals/novo-projeto-modal";
@@ -32,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
+  // Status em português (frontend)
   "Em Desenvolvimento": { 
     color: "text-blue-600", 
     bg: "bg-blue-50", 
@@ -57,6 +59,37 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Reac
     label: "Concluído"
   },
   "Aguardando Pagamento": { 
+    color: "text-amber-600", 
+    bg: "bg-amber-50", 
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Aguardando Pagamento"
+  },
+  // Status em inglês (banco de dados - fallback)
+  "development": { 
+    color: "text-blue-600", 
+    bg: "bg-blue-50", 
+    icon: <Clock className="h-3.5 w-3.5" />,
+    label: "Em Desenvolvimento"
+  },
+  "review": { 
+    color: "text-yellow-600", 
+    bg: "bg-yellow-50", 
+    icon: <AlertCircle className="h-3.5 w-3.5" />,
+    label: "Em Revisão"
+  },
+  "planning": { 
+    color: "text-gray-600", 
+    bg: "bg-gray-50", 
+    icon: <Filter className="h-3.5 w-3.5" />,
+    label: "Planejamento"
+  },
+  "completed": { 
+    color: "text-green-600", 
+    bg: "bg-green-50", 
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Concluído"
+  },
+  "waiting_payment": { 
     color: "text-amber-600", 
     bg: "bg-amber-50", 
     icon: <DollarSign className="h-3.5 w-3.5" />,
@@ -367,7 +400,8 @@ export default function DashboardProjetos() {
         {/* Projects List */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredProjects.map((project, index) => {
-            const status = statusConfig[project.status] || statusConfig["Planejamento"];
+            const status = statusConfig[project.status] || statusConfig["planning"];
+            console.log(`[PROJETO] ${project.name}: status="${project.status}"`, status ? "✓ encontrado" : "✗ não encontrado");
             return (
               <Link
                 key={project.id}
@@ -406,9 +440,9 @@ export default function DashboardProjetos() {
                       {/* Tech Stack */}
                       <div className="flex flex-wrap gap-1.5 mb-4 min-h-[32px]">
                         {project.tech?.slice(0, 4).map((tech: string, i: number) => (
-                          <Badge 
-                            key={tech} 
-                            variant="secondary" 
+                          <Badge
+                            key={tech}
+                            variant="secondary"
                             className="text-xs font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
                           >
                             {tech}
