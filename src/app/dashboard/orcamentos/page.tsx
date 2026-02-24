@@ -23,9 +23,11 @@ import {
   Users,
   ArrowLeft,
   ArrowRight,
+  RefreshCcw,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useRealTimeUpdates } from "@/hooks/use-real-time-updates";
 import { useRouter } from "next/navigation";
 
 interface Budget {
@@ -98,6 +100,20 @@ export default function OrcamentosPage() {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Hook de atualizações em tempo real
+  const { refresh, hasUpdates } = useRealTimeUpdates("orcamentos", {
+    interval: 10000, // 10 segundos
+    onNotificationsUpdate: (data) => {
+      console.log("[ORÇAMENTOS] 📬 Novas notificações detectadas:", data.unreadCount);
+    },
+    onResourceUpdate: ({ type, data }) => {
+      if (type === "orcamentos") {
+        console.log("[ORÇAMENTOS] 📊 Orçamentos atualizados, recarregando...");
+        fetchBudgets();
+      }
+    },
+  });
 
   useEffect(() => {
     fetchBudgets();
@@ -181,11 +197,24 @@ export default function OrcamentosPage() {
       >
         {/* Header */}
         <div className="flex flex-col gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold">Orçamentos</h1>
-            <p className="text-muted-foreground">
-              Gerencie as solicitações de orçamento recebidas
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Orçamentos</h1>
+              <p className="text-muted-foreground">
+                Gerencie as solicitações de orçamento recebidas
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {hasUpdates && (
+                <Badge variant="destructive" className="animate-pulse">
+                  <RefreshCcw className="h-3 w-3 mr-1" />
+                  Atualizações disponíveis
+                </Badge>
+              )}
+              <Button variant="outline" size="sm" onClick={refresh}>
+                <RefreshCcw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 

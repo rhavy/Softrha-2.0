@@ -18,9 +18,11 @@ import {
   Edit2,
   Trash2,
   DollarSign,
+  RefreshCcw,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoProjetoModal } from "@/components/modals/novo-projeto-modal";
+import { useRealTimeUpdates } from "@/hooks/use-real-time-updates";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +60,20 @@ export default function DashboardProjetos() {
   const [projectToDelete, setProjectToDelete] = useState<any>(null);
   const [projectsList, setProjectsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Hook de atualizações em tempo real
+  const { refresh, hasUpdates } = useRealTimeUpdates("projetos", {
+    interval: 10000, // 10 segundos
+    onNotificationsUpdate: (data) => {
+      console.log("[PROJETOS] 📬 Novas notificações detectadas:", data.unreadCount);
+    },
+    onResourceUpdate: ({ type, data }) => {
+      if (type === "projetos") {
+        console.log("[PROJETOS] 📊 Projetos atualizados, recarregando...");
+        fetchProjects();
+      }
+    },
+  });
 
   // Carregar projetos do banco de dados
   const fetchProjects = async () => {
@@ -227,10 +243,21 @@ export default function DashboardProjetos() {
               Gerencie todos os projetos em um só lugar
             </p>
           </div>
-          <Button className="gap-2" onClick={() => setModalOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Novo Projeto
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasUpdates && (
+              <Badge variant="destructive" className="animate-pulse">
+                <RefreshCcw className="h-3 w-3 mr-1" />
+                Atualizações disponíveis
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" onClick={refresh}>
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
+            <Button className="gap-2" onClick={() => setModalOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Novo Projeto
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}

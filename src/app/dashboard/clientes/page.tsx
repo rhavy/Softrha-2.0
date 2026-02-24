@@ -19,9 +19,11 @@ import {
   UserCheck,
   UserX,
   Building,
+  RefreshCcw,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useRealTimeUpdates } from "@/hooks/use-real-time-updates";
 import { NovoClienteModal } from "@/components/modals/novo-cliente-modal";
 import {
   Dialog,
@@ -44,6 +46,20 @@ export default function DashboardClientes() {
   const [clientToDelete, setClientToDelete] = useState<any>(null);
   const [clientsList, setClientsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Hook de atualizações em tempo real
+  const { refresh, hasUpdates } = useRealTimeUpdates("clientes", {
+    interval: 10000, // 10 segundos
+    onNotificationsUpdate: (data) => {
+      console.log("[CLIENTES] 📬 Novas notificações detectadas:", data.unreadCount);
+    },
+    onResourceUpdate: ({ type, data }) => {
+      if (type === "clientes") {
+        console.log("[CLIENTES] 📊 Clientes atualizados, recarregando...");
+        fetchClients();
+      }
+    },
+  });
 
   const fetchClients = async () => {
     try {
@@ -180,10 +196,21 @@ export default function DashboardClientes() {
             <h1 className="text-2xl font-bold">Clientes</h1>
             <p className="text-muted-foreground">Gerencie sua base de clientes</p>
           </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Cliente
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasUpdates && (
+              <Badge variant="destructive" className="animate-pulse">
+                <RefreshCcw className="h-3 w-3 mr-1" />
+                Atualizações disponíveis
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" onClick={refresh}>
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Cliente
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}

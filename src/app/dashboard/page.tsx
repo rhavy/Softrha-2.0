@@ -16,14 +16,37 @@ import {
   CheckCircle2,
   MoreVertical,
   MessageSquare,
+  RefreshCcw,
 } from "lucide-react";
+import { useRealTimeUpdates } from "@/hooks/use-real-time-updates";
+import { useEffect, useState } from "react";
 
 export default function Dashboard() {
+  const [statsData, setStatsData] = useState({
+    projects: 5,
+    tasks: 23,
+    completed: 142,
+    messages: 12,
+  });
+
+  // Hook de atualizações em tempo real para o dashboard
+  const { refresh, hasUpdates } = useRealTimeUpdates("dashboard", {
+    interval: 10000, // 10 segundos
+    onNotificationsUpdate: (data) => {
+      console.log("[DASHBOARD] 📬 Novas notificações detectadas:", data.unreadCount);
+      setStatsData(prev => ({ ...prev, messages: data.unreadCount }));
+    },
+    onResourceUpdate: ({ type, data }) => {
+      console.log("[DASHBOARD] 📊 Recursos atualizados:", type);
+      // Recarregar estatísticas do dashboard
+    },
+  });
+
   const stats = [
-    { label: "Projetos Ativos", value: "5", icon: FolderKanban, change: "+2", trend: "up" },
-    { label: "Tarefas Pendentes", value: "23", icon: Clock, change: "-5", trend: "down" },
-    { label: "Tarefas Concluídas", value: "142", icon: CheckCircle2, change: "+18", trend: "up" },
-    { label: "Mensagens", value: "12", icon: MessageSquare, change: "+4", trend: "up" },
+    { label: "Projetos Ativos", value: statsData.projects.toString(), icon: FolderKanban, change: "+2", trend: "up" },
+    { label: "Tarefas Pendentes", value: statsData.tasks.toString(), icon: Clock, change: "-5", trend: "down" },
+    { label: "Tarefas Concluídas", value: statsData.completed.toString(), icon: CheckCircle2, change: "+18", trend: "up" },
+    { label: "Mensagens", value: statsData.messages.toString(), icon: MessageSquare, change: "+4", trend: "up" },
   ];
 
   const projects = [
@@ -87,10 +110,21 @@ export default function Dashboard() {
               Bem-vindo ao seu dashboard. Aqui está o resumo dos seus projetos.
             </p>
           </div>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Novo Projeto
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasUpdates && (
+              <Badge variant="destructive" className="animate-pulse">
+                <RefreshCcw className="h-3 w-3 mr-1" />
+                Atualizações disponíveis
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" onClick={refresh}>
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Novo Projeto
+            </Button>
+          </div>
         </div>
 
         {/* Stats Grid */}
