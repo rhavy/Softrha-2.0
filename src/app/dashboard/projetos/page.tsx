@@ -34,38 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  // Status principais (usados na lista)
-  "Em Desenvolvimento": { 
-    color: "text-blue-600", 
-    bg: "bg-blue-50", 
-    icon: <Clock className="h-3.5 w-3.5" />,
-    label: "Em Desenvolvimento"
-  },
-  "Em Revisão": { 
-    color: "text-yellow-600", 
-    bg: "bg-yellow-50", 
-    icon: <AlertCircle className="h-3.5 w-3.5" />,
-    label: "Em Revisão"
-  },
-  "Planejamento": { 
-    color: "text-blue-600", 
-    bg: "bg-blue-50", 
-    icon: <Filter className="h-3.5 w-3.5" />,
-    label: "Planejamento"
-  },
-  "Concluído": { 
-    color: "text-green-600", 
-    bg: "bg-green-50", 
-    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-    label: "Concluído"
-  },
-  "Aguardando Pagamento": { 
-    color: "text-amber-600", 
-    bg: "bg-amber-50", 
-    icon: <DollarSign className="h-3.5 w-3.5" />,
-    label: "Aguardando Pagamento"
-  },
-  // Status em inglês (banco de dados - referência: projetos/[id])
+  // Status exatos da página projetos/[id]
   "waiting_payment": { 
     color: "text-amber-600", 
     bg: "bg-amber-50", 
@@ -79,8 +48,8 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Reac
     label: "Planejamento"
   },
   "development": { 
-    color: "text-blue-600", 
-    bg: "bg-blue-50", 
+    color: "text-purple-600", 
+    bg: "bg-purple-50", 
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "Em Desenvolvimento"
   },
@@ -127,6 +96,49 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Reac
     label: "Finalizado (Entregue)"
   },
   "cancelled": { 
+    color: "text-red-600", 
+    bg: "bg-red-50", 
+    icon: <XCircle className="h-3.5 w-3.5" />,
+    label: "Cancelado"
+  },
+  // Alias em português para os filtros
+  "Aguardando Pagamento": { 
+    color: "text-amber-600", 
+    bg: "bg-amber-50", 
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Aguardando Pagamento"
+  },
+  "Planejamento": { 
+    color: "text-blue-600", 
+    bg: "bg-blue-50", 
+    icon: <Filter className="h-3.5 w-3.5" />,
+    label: "Planejamento"
+  },
+  "Em Desenvolvimento": { 
+    color: "text-purple-600", 
+    bg: "bg-purple-50", 
+    icon: <Clock className="h-3.5 w-3.5" />,
+    label: "Em Desenvolvimento"
+  },
+  "Em Revisão": { 
+    color: "text-yellow-600", 
+    bg: "bg-yellow-50", 
+    icon: <AlertCircle className="h-3.5 w-3.5" />,
+    label: "Em Revisão"
+  },
+  "Concluído (Aguardando Entrega)": { 
+    color: "text-green-600", 
+    bg: "bg-green-50", 
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Concluído (Aguardando Entrega)"
+  },
+  "Finalizado (Entregue)": { 
+    color: "text-emerald-600", 
+    bg: "bg-emerald-50", 
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Finalizado (Entregue)"
+  },
+  "Cancelado": { 
     color: "text-red-600", 
     bg: "bg-red-50", 
     icon: <XCircle className="h-3.5 w-3.5" />,
@@ -295,23 +307,11 @@ export default function DashboardProjetos() {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.client.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Normalizar status para comparação (suporta todos os status do sistema)
+    // Normalizar status para comparação (baseado nos status da página projetos/[id])
     const normalizeStatus = (status: string) => {
-      // Status que são variações de desenvolvimento
-      if (status?.startsWith("development")) return "development";
-      if (status?.startsWith("Em Desenvolvimento")) return "development";
-      
+      // Mapeamento exato dos status do sistema
       const statusMap: Record<string, string> = {
-        // PT → Normalizado
-        "Em Desenvolvimento": "development",
-        "Em Revisão": "review",
-        "Planejamento": "planning",
-        "Concluído": "completed",
-        "Aguardando Pagamento": "waiting_payment",
-        "Aguardando Pagamento Final": "waiting_final_payment",
-        "Finalizado": "finished",
-        "Cancelado": "cancelled",
-        // EN → Normalizado
+        // Status em inglês (banco)
         "waiting_payment": "waiting_payment",
         "planning": "planning",
         "development": "development",
@@ -323,6 +323,19 @@ export default function DashboardProjetos() {
         "completed": "completed",
         "finished": "finished",
         "cancelled": "cancelled",
+        // Status em português (frontend/labels)
+        "Aguardando Pagamento": "waiting_payment",
+        "Planejamento": "planning",
+        "Em Desenvolvimento": "development",
+        "20% Concluído": "development",
+        "50% Concluído": "development",
+        "70% Concluído": "development",
+        "100% Concluído": "development",
+        "Aguardando Pagamento Final": "waiting_final_payment",
+        "Concluído (Aguardando Entrega)": "completed",
+        "Finalizado (Entregue)": "finished",
+        "Cancelado": "cancelled",
+        "Em Revisão": "review",
         "review": "review",
       };
       return statusMap[status] || status;
@@ -340,21 +353,27 @@ export default function DashboardProjetos() {
 
   // Normalizar status para stats (agrupar desenvolvimento)
   const normalizeToGroup = (status: string) => {
-    if (status?.startsWith("development") || status?.startsWith("Em Desenvolvimento")) {
+    // Agrupar todas as variações de desenvolvimento
+    if (["development", "development_20", "development_50", "development_70", "development_100", 
+         "Em Desenvolvimento", "20% Concluído", "50% Concluído", "70% Concluído", "100% Concluído"]
+        .includes(status)) {
       return "development";
     }
     const map: Record<string, string> = {
       "waiting_payment": "waiting_payment",
+      "Aguardando Pagamento": "waiting_payment",
       "planning": "planning",
+      "Planejamento": "planning",
       "waiting_final_payment": "waiting_final_payment",
+      "Aguardando Pagamento Final": "waiting_final_payment",
       "completed": "completed",
+      "Concluído (Aguardando Entrega)": "completed",
       "finished": "finished",
+      "Finalizado (Entregue)": "finished",
       "cancelled": "cancelled",
+      "Cancelado": "cancelled",
       "review": "review",
       "Em Revisão": "review",
-      "Concluído": "completed",
-      "Planejamento": "planning",
-      "Aguardando Pagamento": "waiting_payment",
     };
     return map[status] || status;
   };
@@ -481,15 +500,15 @@ export default function DashboardProjetos() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                {["todos", "planning", "development", "review", "completed", "waiting_payment"].map((statusKey) => {
+                {["todos", "waiting_payment", "planning", "development", "completed", "finished"].map((statusKey) => {
                   const config = statusConfig[statusKey];
                   const labelMap: Record<string, string> = {
                     "todos": "Todos",
+                    "waiting_payment": "Aguardando Pagamento",
                     "planning": "Planejamento",
                     "development": "Em Desenvolvimento",
-                    "review": "Em Revisão",
                     "completed": "Concluído",
-                    "waiting_payment": "Aguardando Pagamento",
+                    "finished": "Finalizado",
                   };
                   return (
                     <Button
