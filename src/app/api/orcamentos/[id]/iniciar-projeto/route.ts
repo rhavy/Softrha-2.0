@@ -101,7 +101,7 @@ export async function POST(
       data: {
         name: `${budget.projectType} - ${budget.clientName}`,
         description: budget.details || `Projeto criado a partir do orçamento para ${budget.clientName}`,
-        status: "waiting_payment", // Status especial aguardando pagamento
+        status: "planning", // Projeto começa em planejamento
         type: budget.projectType,
         complexity: complexityMap[budget.complexity] || "medium",
         timeline: timelineMap[budget.timeline] || "normal",

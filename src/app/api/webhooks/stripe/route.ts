@@ -193,20 +193,33 @@ export async function POST(request: NextRequest) {
 
       if (payment) {
         console.log(`[Webhook] Pagamento encontrado: ${payment.id}, tipo: ${payment.type}, status: ${payment.status}`);
+        console.log(`[Webhook] Budget do pagamento:`, payment.budget ? { id: payment.budget.id, status: payment.budget.status } : 'NÃO INCLUÍDO');
+        console.log(`[Webhook] Project do pagamento:`, payment.project ? { id: payment.project.id, status: payment.project.status } : 'NÃO INCLUÍDO');
 
         // Verificar se pagamento já está pago
         if (payment.status === "paid") {
           console.log(`[Webhook] Pagamento ${payment.id} já está pago.`);
-          
+
           // Para pagamento final, ainda precisamos atualizar projeto e budget
-          if (payment.type === "final_payment" && payment.projectId) {
+          if (payment.type === "final_payment") {
             console.log(`[Webhook] Processando atualização de projeto para pagamento final ${payment.id}`);
-            const budget = payment.budget;
+            
+            // Buscar budget se não estiver incluído
+            let budget = payment.budget;
+            if (!budget && payment.budgetId) {
+              console.log(`[Webhook] Budget não incluído, buscando pelo ID: ${payment.budgetId}`);
+              budget = await prisma.budget.findUnique({
+                where: { id: payment.budgetId },
+              });
+            }
+            
             if (budget) {
               await handleFinalPayment(payment, budget);
+            } else {
+              console.error(`[Webhook] Budget não encontrado para pagamento final ${payment.id}`);
             }
           }
-          
+
           return NextResponse.json({ received: true });
         }
 
@@ -223,7 +236,14 @@ export async function POST(request: NextRequest) {
 
           console.log(`[Webhook] Pagamento ${payment.id} marcado como pago.`);
 
-          const budget = payment.budget;
+          // Buscar budget se não estiver incluído
+          let budget = payment.budget;
+          if (!budget && payment.budgetId) {
+            console.log(`[Webhook] Budget não incluído, buscando pelo ID: ${payment.budgetId}`);
+            budget = await prisma.budget.findUnique({
+              where: { id: payment.budgetId },
+            });
+          }
 
           if (budget) {
             // Verificar tipo de pagamento
@@ -247,6 +267,8 @@ export async function POST(request: NextRequest) {
             } else {
               console.warn(`[Webhook] Tipo de pagamento desconhecido: ${payment.type}`);
             }
+          } else {
+            console.error(`[Webhook] Budget não encontrado para pagamento ${payment.id}`);
           }
 
           console.log(`[Webhook] Fluxo de pagamento ${payment.id} completado.`);
@@ -482,17 +504,37 @@ async function handleFinalPayment(payment: any, budget: any) {
     amount: payment.amount,
   });
 
+  // Garantir que budget está disponível
+  let budgetData = budget;
+  if (!budgetData && payment.budgetId) {
+    console.log(`[Webhook] Budget não fornecido, buscando pelo ID: ${payment.budgetId}`);
+    budgetData = await prisma.budget.findUnique({
+      where: { id: payment.budgetId },
+    });
+  }
+
+  if (!budgetData) {
+    console.error(`[Webhook] ERRO: Budget não encontrado para payment ${payment.id}, budgetId: ${payment.budgetId}`);
+    return;
+  }
+
+  console.log(`[Webhook] Budget encontrado:`, {
+    id: budgetData.id,
+    status: budgetData.status,
+    clientName: budgetData.clientName,
+  });
+
   const project = payment.project;
 
   if (!project) {
     console.error("[Webhook] Projeto não encontrado para pagamento final");
     console.error("[Webhook] Tentando buscar projeto pelo ID:", payment.projectId);
-    
+
     // Tentar buscar o projeto
     const foundProject = await prisma.project.findUnique({
       where: { id: payment.projectId },
     });
-    
+
     if (foundProject) {
       console.log("[Webhook] Projeto encontrado:", foundProject.id);
       // Atualizar projeto para concluído
@@ -531,34 +573,34 @@ async function handleFinalPayment(payment: any, budget: any) {
   });
 
   // Atualizar orçamento
-  console.log(`[Webhook] Atualizando orçamento ${budget.id} para completed...`);
+  console.log(`[Webhook] Atualizando orçamento ${budgetData.id} para completed...`);
   await prisma.budget.update({
-    where: { id: budget.id },
+    where: { id: budgetData.id },
     data: {
       status: "completed",
     },
   });
 
-  console.log(`[Webhook] Orçamento ${budget.id} marcado como completed.`);
+  console.log(`[Webhook] Orçamento ${budgetData.id} marcado como completed.`);
   console.log(`[Webhook] === FIM handleFinalPayment ===`);
   console.log(`========================================\n`);
 
   // Enviar e-mail de confirmação
-  if (budget.clientEmail && resend) {
+  if (budgetData.clientEmail && resend) {
     try {
       await resend.emails.send({
         from: process.env.EMAIL_FROM || "Softrha <noreply@softrha.com>",
-        to: budget.clientEmail,
+        to: budgetData.clientEmail,
         subject: `Pagamento Final Confirmado - Agende sua Entrega!`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2563eb;">Pagamento Final Confirmado! 🎉</h2>
-            <p>Olá <strong>${budget.clientName}</strong>,</p>
+            <p>Olá <strong>${budgetData.clientName}</strong>,</p>
             <p>Seu pagamento final foi confirmado e seu projeto está <strong>100% concluído</strong>!</p>
-            
+
             <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <p><strong>Projeto:</strong> ${project.name}</p>
-              <p><strong>Valor Total:</strong> R$ ${budget.finalValue?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+              <p><strong>Valor Total:</strong> R$ ${budgetData.finalValue?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
               <p><strong>Pagamento Final:</strong> R$ ${payment.amount} ✅</p>
             </div>
 

@@ -43,8 +43,13 @@ export function useNotifications(): UseNotificationsReturn {
         credentials: "include",
       });
       console.log('[NOTIFICATIONS] 📡 Status da resposta:', response.status);
-      
-      if (!response.ok) throw new Error("Erro ao buscar notificações");
+      console.log('[NOTIFICATIONS] 📡 Headers da resposta:', response.headers.get('content-type'));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[NOTIFICATIONS] ❌ Erro na resposta:', response.status, errorText);
+        throw new Error(`Erro ao buscar notificações: ${response.status} ${response.statusText}`);
+      }
       const data = await response.json();
       const newUnreadCount = data.unreadCount || 0;
       

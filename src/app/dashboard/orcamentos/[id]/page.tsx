@@ -152,15 +152,18 @@ export default function OrcamentoDetalhesPage() {
   useEffect(() => {
     if (params.id) {
       fetchBudget();
-      
-      // Polling para atualizar automaticamente se status for down_payment_sent
+
+      // Polling só é necessário quando status indica aguardando pagamento
+      // Intervalo aumentado para 10s para reduzir requisições desnecessárias
       const intervalId = setInterval(() => {
-        fetchBudget(false); // Não mostrar loading durante polling
-      }, 5000); // Atualiza a cada 5 segundos
-      
+        if (budget && (budget.status === "down_payment_sent" || budget.status === "contract_signed")) {
+          fetchBudget(false); // Não mostrar loading durante polling
+        }
+      }, 5000); // Atualiza a cada 10 segundos
+
       return () => clearInterval(intervalId);
     }
-  }, [params.id]);
+  }, [params.id, budget?.status]);
 
   const fetchBudget = async (showLoading = true) => {
     try {
@@ -170,7 +173,7 @@ export default function OrcamentoDetalhesPage() {
       const response = await fetch(`/api/orcamentos/${params.id}`);
       if (!response.ok) throw new Error("Erro ao buscar orçamento");
       const data = await response.json();
-      
+
       console.log("[DEBUG] Budget recebido:", {
         id: data.id,
         status: data.status,
@@ -178,7 +181,7 @@ export default function OrcamentoDetalhesPage() {
         contract: data.contract?.id,
         contractConfirmed: data.contract?.confirmed,
       });
-      
+
       setBudget(data);
 
       // Carregar status de confirmação do contrato
@@ -191,7 +194,7 @@ export default function OrcamentoDetalhesPage() {
         console.log("[DEBUG] Status é down_payment_paid, projectId:", data.projectId);
         toast({
           title: "Pagamento Confirmado!",
-          description: data.projectId 
+          description: data.projectId
             ? "Projeto criado automaticamente. Clique em 'Ver Projeto' para acessar."
             : "Pagamento confirmado. Inicie o projeto para continuar.",
         });
@@ -292,7 +295,7 @@ export default function OrcamentoDetalhesPage() {
       } else {
         toast({
           title: "Pagamento já realizado",
-          description: "O cliente já realizou o pagamento da entrada",
+          description: "O cliente já realizou o pagamento da entrada ",
         });
       }
 

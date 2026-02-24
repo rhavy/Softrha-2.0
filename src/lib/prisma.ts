@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaPlanetScale } from "@prisma/adapter-planetscale";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

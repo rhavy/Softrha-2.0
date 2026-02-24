@@ -20,6 +20,7 @@ import {
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useSession } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -49,6 +50,18 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, refresh } = useNotifications();
+  const { data: session } = useSession();
+
+  const user = session?.user;
+  const userName = user?.name || "Usuário";
+  const userEmail = user?.email || "";
+  const userInitials = userName
+    .split(" ")
+    .filter((_, i, arr) => i === 0 || i === arr.length - 1)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   const handleLogout = async () => {
     try {
@@ -270,14 +283,14 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
               className="flex items-center gap-2 hover:bg-accent rounded-md p-1.5 transition-colors"
             >
               <Avatar className="h-8 w-8">
-                <AvatarImage src="/avatar.jpg" alt="User" />
+                <AvatarImage src={user?.image || undefined} alt={userName} />
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                  US
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium leading-none">Usuário SoftRha</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Admin</p>
+                <p className="text-sm font-medium leading-none">{userName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{userEmail}</p>
               </div>
             </button>
 
@@ -297,8 +310,8 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
                     className="absolute right-0 top-full mt-2 w-56 rounded-md border bg-popover p-1 shadow-lg z-50"
                   >
                     <div className="px-3 py-2 border-b mb-1">
-                      <p className="text-sm font-medium">Usuário SoftRha</p>
-                      <p className="text-xs text-muted-foreground">usuario@softrha.com</p>
+                      <p className="text-sm font-medium">{userName}</p>
+                      <p className="text-xs text-muted-foreground">{userEmail}</p>
                     </div>
 
                     <Link
