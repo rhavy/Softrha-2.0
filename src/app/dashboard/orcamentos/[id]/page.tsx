@@ -140,8 +140,13 @@ export default function OrcamentoDetalhesPage() {
 
   // Dialogs
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditValueDialogOpen, setIsEditValueDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
+
+  // Edição de valor
+  const [editFinalValue, setEditFinalValue] = useState<string>("");
+  const [editTimeline, setEditTimeline] = useState<string>("");
 
   // Justificativas
   const [changeReason, setChangeReason] = useState("");
@@ -265,6 +270,49 @@ export default function OrcamentoDetalhesPage() {
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleEditValue = async () => {
+    try {
+      const finalValue = parseFloat(editFinalValue.replace(",", "."));
+      
+      if (isNaN(finalValue) || finalValue <= 0) {
+        toast({
+          title: "Valor inválido",
+          description: "Informe um valor válido maior que zero",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`/api/orcamentos/${params.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          finalValue,
+          timeline: editTimeline,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Erro ao atualizar orçamento");
+
+      toast({
+        title: "Orçamento atualizado!",
+        description: "Valor e prazo foram atualizados com sucesso.",
+        variant: "success",
+      });
+
+      setIsEditValueDialogOpen(false);
+      setEditFinalValue("");
+      setEditTimeline("");
+      fetchBudget();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao atualizar orçamento",
+        variant: "destructive",
+      });
     }
   };
 
@@ -526,8 +574,12 @@ export default function OrcamentoDetalhesPage() {
                   <Button variant="outline" size="sm" onClick={() => setIsApproveDialogOpen(true)}>
                     <Send className="h-4 w-4 mr-1" />Enviar Proposta
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
-                    <Edit2 className="h-4 w-4 mr-1" />Alterar
+                  <Button variant="outline" size="sm" onClick={() => {
+                    setEditFinalValue(budget.finalValue?.toString() || "");
+                    setEditTimeline(budget.timeline || "");
+                    setIsEditValueDialogOpen(true);
+                  }}>
+                    <Edit2 className="h-4 w-4 mr-1" />Alterar Valor/Prazo
                   </Button>
                   <Button variant="destructive" size="sm" onClick={() => setIsDeleteDialogOpen(true)}>
                     <Trash2 className="h-4 w-4 mr-1" />Excluir
@@ -968,6 +1020,73 @@ export default function OrcamentoDetalhesPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleEdit} disabled={!changeReason}>Salvar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog Editar Valor/Prazo */}
+        <Dialog open={isEditValueDialogOpen} onOpenChange={setIsEditValueDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Edit2 className="h-5 w-5" />
+                Alterar Valor e Prazo
+              </DialogTitle>
+              <DialogDescription>
+                Edite o valor final e o prazo de entrega do orçamento
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="finalValue">Valor Final (R$) *</Label>
+                <Input
+                  id="finalValue"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={editFinalValue}
+                  onChange={(e) => setEditFinalValue(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Valor mínimo: R$ {budget.estimatedMin?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="timeline">Prazo de Entrega *</Label>
+                <Select value={editTimeline} onValueChange={setEditTimeline}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o prazo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="urgent">Urgente (1-2 semanas)</SelectItem>
+                    <SelectItem value="normal">Normal (3-4 semanas)</SelectItem>
+                    <SelectItem value="flexible">Flexível (5+ semanas)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 font-medium">Condições de Pagamento</p>
+                <div className="mt-2 space-y-1 text-sm text-blue-700">
+                  <div className="flex justify-between">
+                    <span>Entrada (25%):</span>
+                    <span className="font-medium">
+                      {editFinalValue ? `R$ ${(parseFloat(editFinalValue.replace(",", ".")) * 0.25).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Final (75%):</span>
+                    <span className="font-medium">
+                      {editFinalValue ? `R$ ${(parseFloat(editFinalValue.replace(",", ".")) * 0.75).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditValueDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleEditValue} disabled={!editFinalValue || !editTimeline}>
+                Salvar Alterações
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
