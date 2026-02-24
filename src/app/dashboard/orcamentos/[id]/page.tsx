@@ -28,6 +28,18 @@ import {
   Download,
   Phone,
   Rocket,
+  Layers,
+  Monitor,
+  Palette,
+  Code,
+  Globe,
+  Smartphone,
+  ShoppingCart,
+  BarChart3,
+  CreditCard,
+  MessageSquare,
+  MapPin,
+  Info,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -611,52 +623,114 @@ export default function OrcamentoDetalhesPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <Card className="border-l-4 border-l-green-500 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Valor Mínimo</p>
-                  <p className="text-2xl font-bold text-primary">R$ {budget.estimatedMin?.toLocaleString("pt-BR")}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Valor Final</p>
+                  <p className="text-3xl font-bold mt-1 text-green-600">
+                    {budget.finalValue ? `R$ ${budget.finalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                  </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-primary/20" />
+                <div className="h-12 w-12 rounded-lg bg-green-50 flex items-center justify-center">
+                  <DollarSign className="h-6 w-6 text-green-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-l-4 border-l-blue-500 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Valor Máximo</p>
-                  <p className="text-2xl font-bold text-primary">R$ {budget.estimatedMax?.toLocaleString("pt-BR")}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Entrada (25%)</p>
+                  <p className="text-3xl font-bold mt-1 text-blue-600">
+                    {budget.finalValue ? `R$ ${(budget.finalValue * 0.25).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                  </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-primary/20" />
+                <div className="h-12 w-12 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <CreditCard className="h-6 w-6 text-blue-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-l-4 border-l-purple-500 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Tipo</p>
-                  <p className="text-lg font-semibold">{budget.projectType}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Tipo de Projeto</p>
+                  <p className="text-lg font-bold mt-1 text-purple-600 capitalize">{budget.projectType}</p>
                 </div>
-                <FileText className="h-8 w-8 text-primary/20" />
+                <div className="h-12 w-12 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <Layers className="h-6 w-6 text-purple-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-l-4 border-l-amber-500 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Prazo</p>
-                  <p className="text-lg font-semibold capitalize">{budget.timeline}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Prazo de Entrega</p>
+                  <p className="text-lg font-bold mt-1 text-amber-600 capitalize">{budget.timeline}</p>
                 </div>
-                <Clock className="h-8 w-8 text-primary/20" />
+                <div className="h-12 w-12 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-amber-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Resumo do Orçamento */}
+        <Card className="mb-8 bg-gradient-to-r from-primary/5 to-primary/10 border-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" />
+              Resumo Financeiro
+            </CardTitle>
+            <CardDescription>Visão geral dos valores e condições do orçamento</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Faixa de Valor Estimado</p>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-lg font-semibold">
+                    {budget.estimatedMin ? `R$ ${budget.estimatedMin.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                  </span>
+                  <span className="text-muted-foreground">a</span>
+                  <span className="text-lg font-semibold">
+                    {budget.estimatedMax ? `R$ ${budget.estimatedMax.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Valor Final Negociado</p>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <span className="text-xl font-bold text-green-600">
+                    {budget.finalValue ? `R$ ${budget.finalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "A negociar"}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Condições de Pagamento</p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CreditCard className="h-3 w-3 text-blue-600" />
+                    <span>Entrada: <strong>25%</strong> ({budget.finalValue ? `R$ ${(budget.finalValue * 0.25).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"})</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <DollarSign className="h-3 w-3 text-purple-600" />
+                    <span>Final: <strong>75%</strong> ({budget.finalValue ? `R$ ${(budget.finalValue * 0.75).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Informações */}
         <div className="grid gap-6 lg:grid-cols-3">
@@ -706,30 +780,93 @@ export default function OrcamentoDetalhesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Tipo</p>
-                    <p className="font-medium">{budget.projectType}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {budget.projectType === 'web' && <Monitor className="h-4 w-4 text-purple-600" />}
+                      {budget.projectType === 'mobile' && <Smartphone className="h-4 w-4 text-purple-600" />}
+                      {budget.projectType === 'ecommerce' && <ShoppingCart className="h-4 w-4 text-purple-600" />}
+                      {budget.projectType === 'landing' && <Globe className="h-4 w-4 text-purple-600" />}
+                      {budget.projectType === 'dashboard' && <BarChart3 className="h-4 w-4 text-purple-600" />}
+                      {budget.projectType === 'software' && <Code className="h-4 w-4 text-purple-600" />}
+                      <p className="font-medium capitalize">{budget.projectType}</p>
+                    </div>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Complexidade</p>
-                    <p className="font-medium capitalize">{budget.complexity}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {budget.complexity === 'simple' && <Palette className="h-4 w-4 text-green-600" />}
+                      {budget.complexity === 'medium' && <Palette className="h-4 w-4 text-amber-600" />}
+                      {budget.complexity === 'complex' && <Palette className="h-4 w-4 text-red-600" />}
+                      <p className="font-medium capitalize">{budget.complexity}</p>
+                    </div>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Prazo</p>
-                    <p className="font-medium capitalize">{budget.timeline}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Clock className="h-4 w-4 text-amber-600" />
+                      <p className="font-medium capitalize">{budget.timeline}</p>
+                    </div>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Páginas</p>
-                    <p className="font-medium">{budget.pages}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <p className="font-medium">{budget.pages}</p>
+                    </div>
                   </div>
                 </div>
+
+                {/* Funcionalidades */}
+                {budget.features && Array.isArray(budget.features) && budget.features.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium mb-3 flex items-center gap-2">
+                        <Layers className="h-4 w-4" />
+                        Funcionalidades Selecionadas ({budget.features.length})
+                      </p>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {budget.features.map((feature: string, index: number) => (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            <span className="text-sm capitalize">{feature.replace(/_/g, ' ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Integrações */}
+                {budget.integrations && Array.isArray(budget.integrations) && budget.integrations.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium mb-3 flex items-center gap-2">
+                        <Code className="h-4 w-4" />
+                        Integrações Selecionadas ({budget.integrations.length})
+                      </p>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {budget.integrations.map((integration: string, index: number) => (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                            <CheckCircle2 className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                            <span className="text-sm capitalize">{integration.replace(/_/g, ' ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Descrição */}
                 {budget.details && (
                   <>
                     <Separator />
                     <div>
-                      <p className="text-sm text-muted-foreground mb-2">Descrição</p>
-                      <div className="p-4 bg-muted rounded-md">
+                      <p className="text-sm text-muted-foreground mb-2">Descrição do Projeto</p>
+                      <div className="p-4 bg-muted rounded-md border">
                         <p className="text-sm whitespace-pre-wrap">{budget.details}</p>
                       </div>
                     </div>
