@@ -52,34 +52,92 @@ interface Budget {
   updatedAt: string;
 }
 
-const statusLabels: Record<string, string> = {
-  pending: "Pendente",
-  sent: "Enviado",
-  accepted: "Aceito",
-  rejected: "Rejeitado",
-  user_approved: "Aprovado pelo Cliente",
-  contract_sent: "Contrato Enviado",
-  contract_signed: "Contrato Assinado",
-  down_payment_sent: "Aguardando Entrada",
-  down_payment_paid: "Entrada Paga",
-  final_payment_sent: "Aguardando Final",
-  final_payment_paid: "Final Pago",
-  completed: "Concluído",
-};
-
-const statusColors: Record<string, string> = {
-  pending: "bg-yellow-500",
-  sent: "bg-blue-500",
-  accepted: "bg-green-500",
-  rejected: "bg-red-500",
-  user_approved: "bg-emerald-500",
-  contract_sent: "bg-indigo-500",
-  contract_signed: "bg-purple-500",
-  down_payment_sent: "bg-amber-500",
-  down_payment_paid: "bg-teal-500",
-  final_payment_sent: "bg-orange-500",
-  final_payment_paid: "bg-lime-500",
-  completed: "bg-green-600",
+const statusConfig: Record<string, { color: string; bg: string; border: string; icon: React.ReactNode; label: string }> = {
+  // Status de orçamentos (fluxo completo)
+  "pending": { 
+    color: "text-yellow-600", 
+    bg: "bg-yellow-50", 
+    border: "border-yellow-500",
+    icon: <Clock className="h-3.5 w-3.5" />,
+    label: "Pendente"
+  },
+  "sent": { 
+    color: "text-blue-600", 
+    bg: "bg-blue-50", 
+    border: "border-blue-500",
+    icon: <Mail className="h-3.5 w-3.5" />,
+    label: "Enviado"
+  },
+  "accepted": { 
+    color: "text-green-600", 
+    bg: "bg-green-50", 
+    border: "border-green-500",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Aceito"
+  },
+  "rejected": { 
+    color: "text-red-600", 
+    bg: "bg-red-50", 
+    border: "border-red-500",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Rejeitado"
+  },
+  "user_approved": { 
+    color: "text-emerald-600", 
+    bg: "bg-emerald-50", 
+    border: "border-emerald-500",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Aprovado pelo Cliente"
+  },
+  "contract_sent": { 
+    color: "text-indigo-600", 
+    bg: "bg-indigo-50", 
+    border: "border-indigo-500",
+    icon: <FileText className="h-3.5 w-3.5" />,
+    label: "Contrato Enviado"
+  },
+  "contract_signed": { 
+    color: "text-purple-600", 
+    bg: "bg-purple-50", 
+    border: "border-purple-500",
+    icon: <FileText className="h-3.5 w-3.5" />,
+    label: "Contrato Assinado"
+  },
+  "down_payment_sent": { 
+    color: "text-amber-600", 
+    bg: "bg-amber-50", 
+    border: "border-amber-500",
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Aguardando Entrada"
+  },
+  "down_payment_paid": { 
+    color: "text-teal-600", 
+    bg: "bg-teal-50", 
+    border: "border-teal-500",
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Entrada Paga"
+  },
+  "final_payment_sent": { 
+    color: "text-orange-600", 
+    bg: "bg-orange-50", 
+    border: "border-orange-500",
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Aguardando Final"
+  },
+  "final_payment_paid": { 
+    color: "text-lime-600", 
+    bg: "bg-lime-50", 
+    border: "border-lime-500",
+    icon: <DollarSign className="h-3.5 w-3.5" />,
+    label: "Final Pago"
+  },
+  "completed": { 
+    color: "text-green-600", 
+    bg: "bg-green-50", 
+    border: "border-green-600",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    label: "Concluído"
+  },
 };
 
 const projectTypeLabels: Record<string, string> = {
@@ -117,11 +175,11 @@ export default function OrcamentosPage() {
 
   useEffect(() => {
     fetchBudgets();
-  }, [statusFilter]);
+  }, []);
 
   const fetchBudgets = async () => {
     try {
-      const response = await fetch(`/api/orcamentos?status=${statusFilter}`);
+      const response = await fetch(`/api/orcamentos`);
       if (!response.ok) throw new Error("Erro ao buscar orçamentos");
       const data = await response.json();
       setBudgets(data);
@@ -169,7 +227,9 @@ export default function OrcamentosPage() {
       budget.clientName.toLowerCase().includes(search.toLowerCase()) ||
       budget.clientEmail.toLowerCase().includes(search.toLowerCase()) ||
       budget.company?.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
+    
+    const matchesStatus = statusFilter === "todos" || budget.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   const totalPages = Math.ceil(filteredBudgets.length / itemsPerPage);
@@ -219,58 +279,92 @@ export default function OrcamentosPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+          <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Total de Orçamentos</p>
+                  <p className="text-3xl font-bold mt-1">{stats.total}</p>
                 </div>
-                <FileText className="h-8 w-8 text-primary/20" />
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-primary" />
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-l-4 border-l-yellow-500 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Pendentes</p>
-                  <p className="text-2xl font-bold">{stats.pending}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Pendentes</p>
+                  <p className="text-3xl font-bold mt-1 text-yellow-600">{stats.pending}</p>
                 </div>
-                <Clock className="h-8 w-8 text-yellow-500/20" />
+                <div className="h-12 w-12 rounded-lg bg-yellow-50 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-yellow-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Enviados</p>
-                  <p className="text-2xl font-bold">{stats.sent}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Enviados</p>
+                  <p className="text-3xl font-bold mt-1 text-blue-600">{stats.sent}</p>
                 </div>
-                <Mail className="h-8 w-8 text-blue-500/20" />
+                <div className="h-12 w-12 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Mail className="h-6 w-6 text-blue-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Aceitos</p>
-                  <p className="text-2xl font-bold">{stats.accepted}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Contratos Assinados</p>
+                  <p className="text-3xl font-bold mt-1 text-purple-600">{stats.contractSigned}</p>
                 </div>
-                <CheckCircle2 className="h-8 w-8 text-green-500/20" />
+                <div className="h-12 w-12 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-teal-500 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Entrada Paga</p>
+                  <p className="text-3xl font-bold mt-1 text-teal-600">{stats.downPaymentPaid}</p>
+                </div>
+                <div className="h-12 w-12 rounded-lg bg-teal-50 flex items-center justify-center">
+                  <DollarSign className="h-6 w-6 text-teal-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-green-600 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Concluídos</p>
+                  <p className="text-3xl font-bold mt-1 text-green-600">{stats.completed}</p>
+                </div>
+                <div className="h-12 w-12 rounded-lg bg-green-50 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
+        <Card className="mb-6 shadow-sm">
           <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="relative w-full sm:w-96">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por cliente, email ou empresa..."
@@ -279,20 +373,33 @@ export default function OrcamentosPage() {
                   className="pl-10"
                 />
               </div>
-              <div className="flex gap-2 flex-wrap">
-                {["todos", "pending", "sent", "accepted", "contract_signed", "down_payment_paid", "completed"].map((status) => (
-                  <Button
-                    key={status}
-                    variant={statusFilter === status ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setStatusFilter(status);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    {status === "todos" ? "Todos" : statusLabels[status]}
-                  </Button>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {["todos", "pending", "sent", "contract_signed", "down_payment_paid", "completed"].map((statusKey) => {
+                  const config = statusConfig[statusKey];
+                  const labelMap: Record<string, string> = {
+                    "todos": "Todos",
+                    "pending": "Pendentes",
+                    "sent": "Enviados",
+                    "contract_signed": "Contratos Assinados",
+                    "down_payment_paid": "Entrada Paga",
+                    "completed": "Concluídos",
+                  };
+                  return (
+                    <Button
+                      key={statusKey}
+                      variant={statusFilter === statusKey ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setStatusFilter(statusKey);
+                        setCurrentPage(1);
+                      }}
+                      className={statusFilter === statusKey ? "" : "hover:bg-gray-50"}
+                    >
+                      {config?.icon}
+                      <span className="ml-1.5">{labelMap[statusKey]}</span>
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </CardContent>
