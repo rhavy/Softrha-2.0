@@ -173,6 +173,7 @@ model Budget {
   timeline     String
   features     Json // Array de features selecionadas
   integrations Json // Array de integrações selecionadas
+  technologies Json? // Array de tecnologias selecionadas
   pages        Int      @default(1)
   estimatedMin Float?
   estimatedMax Float?

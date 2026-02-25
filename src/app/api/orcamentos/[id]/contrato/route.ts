@@ -21,7 +21,15 @@ export async function POST(
 
     const { id: budgetId } = await params;
     const body = await request.json();
-    const { content, sendEmail = true, sendWhatsApp = false } = body;
+    const {
+      templateType,
+      softrhaData,
+      clientData,
+      projectData,
+      sendEmail = true,
+      sendWhatsApp = false,
+      content // Este pode ser o base64 do PDF se gerado no front
+    } = body;
 
     // Buscar orçamento
     const budget = await prisma.budget.findUnique({
@@ -38,23 +46,175 @@ export async function POST(
       );
     }
 
+    // Gerar conteúdo de texto para compatibilidade legada ou fallback
+    const legacyContent = templateType === "combinado"
+      ? `CONTRATO COMBINADO - ${clientData.company || clientData.name}\nValor: R$ ${projectData.finalValue}\nInclui: Proposta Técnica + Contrato Unificado`
+      : templateType === "contrato"
+        ? `CONTRATO UNIFICADO - ${clientData.company || clientData.name}\nValor: R$ ${projectData.finalValue}`
+        : `PROPOSTA TÉCNICA - ${clientData.company || clientData.name}\nValor: R$ ${projectData.finalValue}`;
+
     // Verificar se já existe contrato
     if (budget.contract) {
-      return NextResponse.json(
-        { error: "Contrato já existe para este orçamento" },
-        { status: 400 }
-      );
+      // Atualizar contrato existente com novos dados
+      const updatedContract = await prisma.contract.update({
+        where: { budgetId },
+        data: {
+          content: legacyContent,
+          status: "pending",
+          sentAt: null,
+          signedByClientAt: null,
+          metadata: {
+            templateType,
+            softrha: softrhaData,
+            client: {
+              name: clientData.name,
+              company: clientData.company,
+              document: clientData.document,
+              address: clientData.address,
+              representative: clientData.representative,
+              email: clientData.email,
+              phone: clientData.phone,
+            },
+            project: {
+              type: projectData.type,
+              complexity: projectData.complexity,
+              timeline: projectData.timeline,
+              features: projectData.features,
+              integrations: projectData.integrations,
+              technologies: projectData.technologies,
+              pages: projectData.pages,
+              finalValue: projectData.finalValue,
+              details: projectData.details,
+            },
+            pdfGenerated: !!content,
+            editedAt: new Date().toISOString(),
+            reenviado: true,
+          } as any
+        },
+      });
+
+      // Enviar e-mail com contrato (reatualização)
+      if (sendEmail && (clientData.email || budget.clientEmail) && resend) {
+        const targetEmail = clientData.email || budget.clientEmail;
+        const documentTitle = "Proposta Técnica & Contrato";
+
+        try {
+          await resend.emails.send({
+            from: process.env.EMAIL_FROM || "Softrha <noreply@softrha.com>",
+            to: targetEmail,
+            subject: `Atualização: ${documentTitle} - ${projectData.type}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #334155;">
+                <h2 style="color: #2563eb;">Atualização do Contrato</h2>
+                <p>Olá <strong>${clientData.representative || clientData.name}</strong>,</p>
+                <p>O documento do seu projeto <strong>${projectData.type}</strong> foi atualizado. Por favor, revise a nova versão.</p>
+
+                <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 25px 0;">
+                  <p style="margin: 0; font-size: 14px; color: #64748b;">Resumo do Investimento:</p>
+                  <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #0f172a;">R$ ${projectData.finalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+
+                <p>Para visualizar o documento atualizado e realizar a assinatura digital, clique no botão abaixo:</p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${updatedContract.id}"
+                     style="display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                    Acessar Documento Atualizado
+                  </a>
+                </div>
+
+                <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+                  Se você tiver qualquer dúvida sobre os termos ou o escopo técnico, sinta-se à vontade para entrar em contato conosco diretamente.
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+                <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+                  <strong>SoftRha IT Solutions</strong><br />
+                  Este é um e-mail automático, por favor não responda.
+                </p>
+              </div>
+            `,
+          });
+
+          await prisma.contract.update({
+            where: { id: updatedContract.id },
+            data: {
+              sentAt: new Date(),
+              status: "sent",
+            },
+          });
+        } catch (emailError) {
+          console.error("Erro ao enviar e-mail de atualização:", emailError);
+        }
+      }
+
+      // Preparar mensagem para WhatsApp
+      if (sendWhatsApp && budget.clientPhone) {
+        const phoneDigits = budget.clientPhone.replace(/\D/g, "");
+        const whatsappMessage = `Olá ${budget.clientName}! O contrato do seu projeto foi atualizado.\n\nProjeto: ${budget.projectType}\n\nAcesse: ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${updatedContract.id}`;
+
+        const whatsappUrl = `https://wa.me/55${phoneDigits}?text=${encodeURIComponent(whatsappMessage)}`;
+
+        return NextResponse.json({
+          success: true,
+          contract: updatedContract,
+          whatsappUrl,
+          emailSent: sendEmail,
+          updated: true,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        contract: updatedContract,
+        emailSent: sendEmail,
+        updated: true,
+      });
     }
 
-    // Gerar conteúdo padrão do contrato se não fornecido
-    const contractContent = content || gerarContratoPadrao(budget);
+    // Atualizar orçamento com os dados editados do projeto
+    await prisma.budget.update({
+      where: { id: budgetId },
+      data: {
+        finalValue: projectData.finalValue,
+        timeline: projectData.timeline,
+        technologies: projectData.technologies,
+        details: projectData.details,
+      },
+    });
 
-    // Criar contrato
+    // Criar contrato com metadados completos (todos os dados editados)
     const contract = await prisma.contract.create({
       data: {
         budgetId,
-        content: contractContent,
+        content: legacyContent,
         status: "pending",
+        metadata: {
+          templateType,
+          softrha: softrhaData,
+          client: {
+            name: clientData.name,
+            company: clientData.company,
+            document: clientData.document,
+            address: clientData.address,
+            representative: clientData.representative,
+            email: clientData.email,
+            phone: clientData.phone,
+          },
+          project: {
+            type: projectData.type,
+            complexity: projectData.complexity,
+            timeline: projectData.timeline,
+            features: projectData.features,
+            integrations: projectData.integrations,
+            technologies: projectData.technologies,
+            pages: projectData.pages,
+            finalValue: projectData.finalValue,
+            details: projectData.details,
+          },
+          pdfGenerated: !!content,
+          editedAt: new Date().toISOString(),
+        } as any
       },
     });
 
@@ -67,37 +227,43 @@ export async function POST(
     });
 
     // Enviar e-mail com contrato
-    if (sendEmail && budget.clientEmail && resend) {
+    if (sendEmail && (clientData.email || budget.clientEmail) && resend) {
+      const targetEmail = clientData.email || budget.clientEmail;
+      const documentTitle = templateType === "combinado" ? "Proposta Técnica & Contrato" : templateType === "contrato" ? "Contrato" : "Proposta Técnica";
+      
       try {
         await resend.emails.send({
           from: process.env.EMAIL_FROM || "Softrha <noreply@softrha.com>",
-          to: budget.clientEmail,
-          subject: `Contrato de Prestação de Serviços - ${budget.projectType}`,
+          to: targetEmail,
+          subject: `${documentTitle} - ${projectData.type}`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Contrato de Prestação de Serviços</h2>
-              <p>Olá <strong>${budget.clientName}</strong>,</p>
-              <p>Segue abaixo o contrato para a prestação de serviços referente ao projeto <strong>${budget.projectType}</strong>.</p>
-              
-              <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; max-height: 300px; overflow-y: auto;">
-                <pre style="white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">${contractContent}</pre>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #334155;">
+              <h2 style="color: #2563eb;">${templateType === "combinado" ? "Sua Proposta Técnica e Contrato estão Prontos" : templateType === "contrato" ? "Seu Contrato está Pronto" : "Sua Proposta Técnica e Comercial"}</h2>
+              <p>Olá <strong>${clientData.representative || clientData.name}</strong>,</p>
+              <p>É um prazer seguir com o seu projeto <strong>${projectData.type}</strong>. Preparamos o documento completo para sua revisão e assinatura.</p>
+
+              <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 25px 0;">
+                <p style="margin: 0; font-size: 14px; color: #64748b;">Resumo do Investimento:</p>
+                <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: bold; color: #0f172a;">R$ ${projectData.finalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
 
-              <p>Por favor, revise o contrato e faça o upload do documento assinado através do link abaixo:</p>
-              
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${contract.id}" 
-                 style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
-                Assinar Contrato
-              </a>
-              
-              <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-                Após a assinatura, nossa equipe irá revisar e dar sequência ao projeto.
+              <p>Para visualizar o documento oficial e realizar a assinatura digital, clique no botão abaixo:</p>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${contract.id}"
+                   style="display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                  Acessar Documento e Assinar
+                </a>
+              </div>
+
+              <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+                Se você tiver qualquer dúvida sobre os termos ou o escopo técnico, sinta-se à vontade para entrar em contato conosco diretamente.
               </p>
-              
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
-              <p style="color: #6b7280; font-size: 12px;">
-                Atenciosamente,<br />
-                Equipe Softrha
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+              <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+                <strong>SoftRha IT Solutions</strong><br />
+                Este é um e-mail automático, por favor não responda.
               </p>
             </div>
           `,
@@ -120,9 +286,9 @@ export async function POST(
     if (sendWhatsApp && budget.clientPhone) {
       const phoneDigits = budget.clientPhone.replace(/\D/g, "");
       const whatsappMessage = `Olá ${budget.clientName}! Seu contrato está pronto para assinatura.\n\nProjeto: ${budget.projectType}\n\nAcesse: ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${contract.id}`;
-      
+
       const whatsappUrl = `https://wa.me/55${phoneDigits}?text=${encodeURIComponent(whatsappMessage)}`;
-      
+
       return NextResponse.json({
         success: true,
         contract,
@@ -148,7 +314,7 @@ export async function POST(
 // Função auxiliar para gerar contrato padrão
 function gerarContratoPadrao(budget: any): string {
   const dataAtual = new Date().toLocaleDateString("pt-BR");
-  
+
   return `CONTRATO DE PRESTAÇÃO DE SERVIÇOS
 
 CONTRATADA: Softrha, empresa de tecnologia, CNPJ XX.XXX.XXX/0001-XX.

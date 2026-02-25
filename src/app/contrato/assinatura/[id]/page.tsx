@@ -3,12 +3,13 @@
 import { useEffect, useState, Suspense, useRef } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { FileSignature, Upload, CheckCircle2, FileText, Download, Printer } from "lucide-react";
+import { FileSignature, Upload, CheckCircle2, FileText, Download, Printer, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { PropostaTecnicaElite, ContratoUnificado, ContratoCombinado } from "@/components/dashboard/contract-templates";
 
 function AssinaturaContent() {
   const params = useParams();
@@ -38,74 +39,44 @@ function AssinaturaContent() {
     }
   }, [params.id, toast]);
 
-  const contractRef = useRef<HTMLDivElement>(null);
-
   const handleDownload = async () => {
-    if (!contract?.content) return;
+    const elementId = contract?.metadata?.templateType === "combinado" ? "contrato-combinado" 
+                      : contract?.metadata?.templateType === "proposta" ? "proposta-tecnica" 
+                      : "contrato-unificado";
+    const element = document.getElementById(elementId) || document.getElementById("contract-content");
+
+    if (!element) {
+      toast({ title: "Erro", description: "Documento não encontrado para download", variant: "destructive" });
+      return;
+    }
 
     toast({
       title: "Gerando PDF...",
-      description: "Aguarde enquanto o PDF é gerado",
+      description: "Aguarde enquanto o documento é preparado",
     });
 
     try {
-      const html2pdf = (await import("html2pdf.js")).default;
+      const html2pdfModule = (await import("html2pdf.js")) as any;
+      const pdfLib = typeof html2pdfModule.default === 'function' ? html2pdfModule.default : html2pdfModule;
 
-      // Criar documento HTML isolado em iframe
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="utf-8"><title>Contrato</title></head>
-        <body style="margin:0;padding:40px;font-family:Arial,sans-serif;background:#fff;color:#000;">
-          <div style="max-width:800px;margin:0 auto;">
-            <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:20px;margin-bottom:30px;">
-              <h1 style="font-size:22px;margin:0;color:#000;">Contrato de Prestação de Serviços</h1>
-              <p style="font-size:12px;color:#333;margin:5px 0;">Softrha - Desenvolvimento de Software</p>
-            </div>
-            <div style="margin-bottom:20px;font-size:12px;background:#f5f5f5;padding:15px;">
-              <strong>CONTRATANTE:</strong> ${contract.budget?.clientName || 'Não informado'}<br/>
-              <strong>DATA:</strong> ${new Date().toLocaleDateString('pt-BR')}
-            </div>
-            <div style="font-size:11px;line-height:1.6;text-align:justify;white-space:pre-wrap;">${contract.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-            <div style="margin-top:50px;border-top:1px solid #ddd;pt:10px;font-size:9px;color:#666;text-align:center;">Documento gerado eletronicamente</div>
-          </div>
-        </body>
-        </html>
-      `;
-
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:800px;height:600px;border:none;visibility:hidden;';
-      document.body.appendChild(iframe);
-
-      iframe.onload = () => {
-        if (!iframe.contentWindow?.document) return;
-
-        const opt = {
-          margin: [15, 15, 15, 15] as [number, number, number, number],
-          filename: `contrato-${contract.budget?.clientName?.replace(/\s+/g, '_') || 'cliente'}.pdf`,
-          image: { type: 'jpeg' as const, quality: 1.0 },
-          html2canvas: { scale: 3, useCORS: true, backgroundColor: '#ffffff' },
-          jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-        } as const;
-
-        html2pdf().set(opt).from(iframe.contentWindow.document.body).save().then(() => {
-          toast({ title: "PDF gerado!", description: "Contrato baixado com sucesso" });
-          setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000);
-        }).catch((error) => {
-          console.error('Erro:', error);
-          document.body.removeChild(iframe);
-          URL.revokeObjectURL(url);
-          toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
-        });
+      const opt = {
+        margin: 10,
+        filename: `${contract?.metadata?.templateType === "combinado" ? "Contrato_Completo" : contract?.metadata?.templateType === "proposta" ? "Proposta" : "Contrato"}_${contract?.metadata?.client?.name.replace(/\s+/g, '_') || 'SoftRha'}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          logging: false
+        },
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
       };
 
-      iframe.src = url;
+      await pdfLib().set(opt).from(element).save();
+      toast({ title: "Download iniciado!", description: "Seu contrato foi gerado com sucesso." });
     } catch (error) {
-      console.error('Erro:', error);
-      toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
+      console.error('Erro ao gerar PDF:', error);
+      toast({ title: "Erro", description: "Falha ao gerar PDF. Tente imprimir o documento.", variant: "destructive" });
     }
   };
 
@@ -182,7 +153,7 @@ function AssinaturaContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     );
@@ -190,7 +161,7 @@ function AssinaturaContent() {
 
   if (!contract) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <Card className="max-w-md w-full border-0 shadow-xl">
           <CardHeader className="text-center">
             <FileText className="h-16 w-16 mx-auto text-red-500 mb-4" />
@@ -206,14 +177,14 @@ function AssinaturaContent() {
 
   if (contract.status === "signed" || contract.status === "signed_by_client") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-green-50 p-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
           <Card className="border-0 shadow-xl">
             <CardHeader className="text-center">
               <CheckCircle2 className="h-20 w-20 mx-auto text-green-500 mb-4" />
               <CardTitle>Contrato Já Assinado!</CardTitle>
               <CardDescription>
-                Este contrato já foi assinado e enviado.
+                Este contrato já foi assinado e enviado. Agradecemos a parceria!
               </CardDescription>
             </CardHeader>
           </Card>
@@ -222,127 +193,169 @@ function AssinaturaContent() {
     );
   }
 
+  const hasMetadata = contract.metadata && contract.metadata.softrha && contract.metadata.client;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex flex-col items-center bg-slate-100 p-4 md:p-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-4xl"
+        className="w-full max-w-5xl grid lg:grid-cols-12 gap-8"
       >
-        {/* Header - Esconder na impressão */}
-        <div className="text-center mb-8 pt-8 print:hidden">
-          <h1 className="text-3xl font-bold mb-2">Assinatura de Contrato</h1>
-          <p className="text-muted-foreground">
-            {contract.budget?.projectType} - {contract.budget?.clientName}
-          </p>
+        {/* Left Side: Document Preview */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="bg-white rounded-xl shadow-2xl overflow-hidden min-h-[800px] relative">
+            <div className="absolute top-4 right-4 print:hidden flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleDownload} className="bg-white/80 backdrop-blur">
+                <Download className="h-4 w-4 mr-2" /> PDF
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => window.print()} className="bg-white/80 backdrop-blur">
+                <Printer className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div id="contract-content" className="p-0 border-0 scale-[0.85] md:scale-100 origin-top">
+              {hasMetadata ? (
+                contract.metadata.templateType === "combinado" ? (
+                  <ContratoCombinado
+                    client={contract.metadata.client}
+                    softrha={contract.metadata.softrha}
+                    project={contract.metadata.project}
+                    date={new Date(contract.createdAt)}
+                  />
+                ) : contract.metadata.templateType === "proposta" ? (
+                  <PropostaTecnicaElite
+                    client={contract.metadata.client}
+                    softrha={contract.metadata.softrha}
+                    project={contract.metadata.project}
+                    date={new Date(contract.createdAt)}
+                  />
+                ) : (
+                  <ContratoUnificado
+                    client={contract.metadata.client}
+                    softrha={contract.metadata.softrha}
+                    project={contract.metadata.project}
+                    date={new Date(contract.createdAt)}
+                  />
+                )
+              ) : (
+                <div className="p-12 font-sans whitespace-pre-wrap text-sm leading-relaxed">
+                  <h1 className="text-2xl font-bold mb-6 text-center uppercase underline">Contrato de Prestação de Serviços</h1>
+                  {contract.content}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <Card className="border-0 shadow-xl">
-          <CardHeader className="print:hidden">
-            <div className="flex items-center gap-3">
-              <FileSignature className="h-8 w-8 text-purple-600" />
-              <div>
-                <CardTitle>Contrato de Prestação de Serviços</CardTitle>
-                <CardDescription>
-                  {contract.budget?.projectType} - {contract.budget?.clientName}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-
-          {/* Cabeçalho para impressão */}
-          <div className="print-header hidden print:block mb-6">
-            <h1 className="text-2xl font-bold mb-2">Contrato de Prestação de Serviços</h1>
-            <p className="text-sm text-gray-600">Softrha - Desenvolvimento de Software</p>
-            <p className="text-sm text-gray-600 mb-4">Cliente: {contract.budget?.clientName}</p>
-            <hr className="my-4" />
-          </div>
-
-          <CardContent className="space-y-6 print:space-y-4">
-            {/* Instruções */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg print:hidden">
-              <div className="flex gap-3">
-                <FileText className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="space-y-2">
-                  <p className="font-semibold text-blue-800">Instruções para assinatura:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-sm text-blue-700">
-                    <li>Baixe o contrato em PDF clicando no botão "Baixar em PDF"</li>
-                    <li>Imprima o documento (ou assine digitalmente)</li>
-                    <li>Assine o contrato</li>
-                    <li>Digitalize o documento assinado em PDF</li>
-                    <li>Faça o upload do PDF assinado abaixo</li>
-                  </ol>
+        {/* Right Side: Signing Actions */}
+        <div className="lg:col-span-5 space-y-6">
+          <Card className="border-0 shadow-xl sticky top-8">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <FileSignature className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Assinar Documento</CardTitle>
+                  <CardDescription>Siga os passos para finalizar</CardDescription>
                 </div>
               </div>
-            </div>
-
-            {/* Botões de Download e Impressão */}
-            <div className="flex gap-2 print:hidden">
-              <Button onClick={handleDownload} variant="outline" className="flex-1">
-                <Download className="h-4 w-4 mr-2" />
-                Baixar em PDF
-              </Button>
-            </div>
-
-            {/* Visualização do Contrato */}
-            <div ref={contractRef} className="bg-muted rounded-lg p-6 max-h-[500px] overflow-y-auto print:max-h-none print:overflow-visible print:bg-white print:p-0">
-              <pre className="text-sm whitespace-pre-wrap font-sans print:text-black print:text-base">
-                {contract.content}
-              </pre>
-            </div>
-
-            {/* Upload - Esconder na impressão */}
-            <div className="space-y-4 print:hidden">
-              <div className="space-y-2">
-                <Label>Seu Nome Completo (para assinatura)</Label>
-                <Input
-                  placeholder="Digite seu nome completo"
-                  value={signatureName}
-                  onChange={(e) => setSignatureName(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Upload do Contrato Assinado (PDF)</Label>
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                  <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {selectedFile ? selectedFile.name : "Clique para selecionar o arquivo PDF"}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-sm text-amber-800 font-medium mb-1">Passo 1: Revisão e Download</p>
+                  <p className="text-xs text-amber-700 leading-relaxed mb-3">
+                    Revise o conteúdo ao lado. Se preferir assinar fisicamente, baixe o PDF abaixo, assine e faça o upload.
                   </p>
-                  <Input
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <Button variant="outline" onClick={() => document.getElementById("file-upload")?.click()} type="button">
-                    Selecionar Arquivo
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full bg-white border-amber-300 text-amber-700 hover:bg-amber-100 gap-2"
+                    onClick={handleDownload}
+                  >
+                    <Download className="h-4 w-4" /> Baixar PDF para Imprimir
                   </Button>
                 </div>
-              </div>
 
-              <Button
-                className="w-full"
-                onClick={handleUpload}
-                disabled={isUploading || !selectedFile || !signatureName}
-                size="lg"
-              >
-                {isUploading ? (
-                  <>
-                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Enviar Contrato Assinado
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label>Passo 2: Seu Nome Completo</Label>
+                    {signatureName && contract?.metadata?.client?.name && signatureName.trim().toLowerCase() !== contract.metadata.client.name.trim().toLowerCase() && (
+                      <span className="text-[10px] text-red-500 font-medium">Nome não corresponde ao contrato</span>
+                    )}
+                  </div>
+                  <Input
+                    placeholder="Nome completo igual ao do contrato"
+                    value={signatureName}
+                    onChange={(e) => setSignatureName(e.target.value)}
+                    className={`h-11 ${signatureName && contract?.metadata?.client?.name && signatureName.trim().toLowerCase() !== contract.metadata.client.name.trim().toLowerCase() ? "border-red-300 focus-visible:ring-red-300" : ""}`}
+                  />
+                  {contract?.metadata?.client?.name && (
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Deve ser exatamente: <span className="font-semibold text-slate-700">{contract.metadata.client.name}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Passo 3: Upload do PDF Assinado</Label>
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${selectedFile ? "border-green-300 bg-green-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      }`}
+                  >
+                    <Upload className={`h-8 w-8 mx-auto mb-2 ${selectedFile ? "text-green-500" : "text-slate-400"}`} />
+                    <p className="text-sm font-medium mb-1">
+                      {selectedFile ? selectedFile.name : "Selecione o arquivo PDF"}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mb-3 uppercase tracking-wider">Apenas PDF aceito</p>
+
+                    <Input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById("file-upload")?.click()}
+                      type="button"
+                    >
+                      Procurar Arquivo
+                    </Button>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full h-12 text-lg font-semibold shadow-lg shadow-primary/20"
+                  onClick={handleUpload}
+                  disabled={
+                    isUploading ||
+                    !selectedFile ||
+                    !signatureName ||
+                    signatureName.trim().toLowerCase() !== (contract?.metadata?.client?.name || "").trim().toLowerCase()
+                  }
+                >
+                  {isUploading ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                      Processando...
+                    </>
+                  ) : (
+                    "Finalizar Assinatura"
+                  )}
+                </Button>
+
+                <p className="text-[10px] text-center text-slate-400 px-4">
+                  Ao clicar em finalizar, você declara que revisou e concorda com todos os termos apresentados no documento.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </motion.div>
     </div>
   );
@@ -351,7 +364,7 @@ function AssinaturaContent() {
 export default function AssinarContratoPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     }>

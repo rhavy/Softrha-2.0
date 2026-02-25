@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, FileText, Printer, Download } from "lucide-react";
+import { CheckCircle2, XCircle, FileText, Printer, Download, Calendar, Clock, Rocket, Layers, Code, Monitor, Smartphone, ShoppingCart, Globe, BarChart3, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,46 @@ function AprovarContent() {
   const [budget, setBudget] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isResponding, setIsResponding] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Converter timeline para semanas
+  const getTimelineInWeeks = (timeline: string): string => {
+    const timelineMap: Record<string, string> = {
+      urgent: "1-2 semanas",
+      normal: "3-6 semanas",
+      flexible: "6+ semanas",
+    };
+    return timelineMap[timeline] || timeline;
+  };
+
+  // Calcular data prevista de entrega
+  const getExpectedDeliveryDate = (): string => {
+    if (!budget || !budget.startDate) return "—";
+
+    const startDate = new Date(budget.startDate);
+    const timelineWeeks: Record<string, number> = {
+      urgent: 2,
+      normal: 6,
+      flexible: 8,
+    };
+    const weeks = timelineWeeks[budget.timeline] || 6;
+    const deliveryDate = new Date(startDate);
+    deliveryDate.setDate(deliveryDate.getDate() + (weeks * 7));
+    return deliveryDate.toLocaleDateString("pt-BR");
+  };
+
+  // Obter ícone do tipo de projeto
+  const getProjectTypeIcon = (type: string) => {
+    const icons: Record<string, any> = {
+      web: Monitor,
+      mobile: Smartphone,
+      ecommerce: ShoppingCart,
+      landing: Globe,
+      dashboard: BarChart3,
+      software: Code,
+    };
+    return icons[type] || FileText;
+  };
 
   useEffect(() => {
     if (params.token) {
@@ -73,12 +113,9 @@ function AprovarContent() {
     window.print();
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
+  // Gerar PDF
+  const handleDownloadPDF = async () => {
+    window.print();
   }
 
   if (!budget) {
@@ -104,7 +141,7 @@ function AprovarContent() {
         </div>
 
         {/* Conteúdo para Impressão */}
-        <div className="bg-white rounded-lg shadow-xl p-8 mb-6 print:shadow-none print:p-0">
+        <div ref={contentRef} className="bg-white rounded-lg shadow-xl p-8 mb-6 print:shadow-none print:p-0">
           {/* Cabeçalho para Impressão */}
           <div className="hidden print:block mb-6">
             <h1 className="text-2xl font-bold mb-2">Proposta Comercial</h1>
@@ -146,32 +183,67 @@ function AprovarContent() {
           {/* Detalhes do Projeto */}
           <Card className="mb-6 print:break-inside-avoid">
             <CardHeader>
-              <CardTitle>Detalhes do Projeto</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                {(() => {
+                  const Icon = getProjectTypeIcon(budget.projectType);
+                  return <Icon className="h-5 w-5" />;
+                })()}
+                Detalhes do Projeto
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Tipo de Projeto</p>
-                  <p className="font-medium">{budget.projectType}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {(() => {
+                      const Icon = getProjectTypeIcon(budget.projectType);
+                      return <Icon className="h-4 w-4 text-purple-600" />;
+                    })()}
+                    <p className="font-medium capitalize">{budget.projectType}</p>
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Complexidade</p>
-                  <p className="font-medium capitalize">{budget.complexity}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Palette className="h-4 w-4 text-blue-600" />
+                    <p className="font-medium capitalize">{budget.complexity}</p>
+                  </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Prazo</p>
-                  <p className="font-medium capitalize">{budget.timeline}</p>
+                  <p className="text-sm text-muted-foreground">Prazo de Entrega</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <p className="font-medium">{getTimelineInWeeks(budget.timeline)}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Data de Início</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Rocket className="h-4 w-4 text-green-600" />
+                    <p className="font-medium">{budget.startDate ? new Date(budget.startDate).toLocaleDateString("pt-BR") : "—"}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Previsão de Entrega</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                    <p className="font-medium">{getExpectedDeliveryDate()}</p>
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Páginas</p>
-                  <p className="font-medium">{budget.pages}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <FileText className="h-4 w-4 text-green-600" />
+                    <p className="font-medium">{budget.pages}</p>
+                  </div>
                 </div>
               </div>
 
               {budget.details && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">Descrição</p>
-                  <div className="p-4 bg-muted rounded-md">
+                  <p className="text-sm text-muted-foreground mb-2">Descrição do Projeto</p>
+                  <div className="p-4 bg-muted rounded-md border">
                     <p className="text-sm whitespace-pre-wrap">{budget.details}</p>
                   </div>
                 </div>
@@ -179,10 +251,16 @@ function AprovarContent() {
 
               {budget.features && Array.isArray(budget.features) && budget.features.length > 0 && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">Funcionalidades</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Funcionalidades ({budget.features.length})
+                  </p>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {budget.features.map((f: string) => (
-                      <Badge key={f} variant="secondary">{f}</Badge>
+                      <div key={f} className="flex items-center gap-2 p-2 bg-green-50 rounded-md border border-green-100">
+                        <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+                        <span className="text-sm capitalize">{f.replace(/_/g, ' ')}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -190,10 +268,16 @@ function AprovarContent() {
 
               {budget.integrations && Array.isArray(budget.integrations) && budget.integrations.length > 0 && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">Integrações</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <Code className="h-4 w-4" />
+                    Integrações ({budget.integrations.length})
+                  </p>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {budget.integrations.map((i: string) => (
-                      <Badge key={i} variant="outline">{i}</Badge>
+                      <div key={i} className="flex items-center gap-2 p-2 bg-blue-50 rounded-md border border-blue-100">
+                        <CheckCircle2 className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                        <span className="text-sm capitalize">{i.replace(/_/g, ' ')}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -258,7 +342,7 @@ function AprovarContent() {
               <Printer className="h-4 w-4 mr-2" />
               Imprimir Proposta
             </Button>
-            <Button variant="outline" onClick={handlePrint}>
+            <Button variant="outline" onClick={handleDownloadPDF}>
               <Download className="h-4 w-4 mr-2" />
               Baixar PDF
             </Button>

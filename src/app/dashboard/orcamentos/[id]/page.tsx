@@ -37,9 +37,17 @@ import {
   ShoppingCart,
   BarChart3,
   CreditCard,
+  Plus,
+  X,
   MessageSquare,
   MapPin,
   Info,
+  Activity,
+  CheckCircle,
+  Circle,
+  StepForward,
+  History,
+  RefreshCcw,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -88,6 +96,7 @@ interface Budget {
   deletionDescription?: string;
   approvalToken?: string | null;
   contract?: any;
+  technologies?: string[] | any;
 }
 
 const statusLabels: Record<string, string> = {
@@ -150,6 +159,8 @@ export default function OrcamentoDetalhesPage() {
   const [editTimeline, setEditTimeline] = useState<string>("");
   const [editStartDate, setEditStartDate] = useState<string>("");
   const [formattedBudget, setFormattedBudget] = useState<string>("");
+  const [editTechnologies, setEditTechnologies] = useState<string[]>([]);
+  const [techInput, setTechInput] = useState("");
 
   // Converter timeline para semanas
   const getTimelineInWeeks = (timeline: string): string => {
@@ -159,6 +170,22 @@ export default function OrcamentoDetalhesPage() {
       flexible: "6+ semanas",
     };
     return timelineMap[timeline] || timeline;
+  };
+
+  // Calcular data prevista de entrega com base na startDate e timeline
+  const getExpectedDeliveryDate = (): string => {
+    if (!budget || !budget.startDate) return "—";
+
+    const startDate = new Date(budget.startDate);
+    const timelineWeeks: Record<string, number> = {
+      urgent: 2,
+      normal: 6,
+      flexible: 8,
+    };
+    const weeks = timelineWeeks[budget.timeline] || 6;
+    const deliveryDate = new Date(startDate);
+    deliveryDate.setDate(deliveryDate.getDate() + (weeks * 7));
+    return deliveryDate.toLocaleDateString("pt-BR");
   };
 
   // Justificativas
@@ -179,9 +206,13 @@ export default function OrcamentoDetalhesPage() {
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [paymentLinkData, setPaymentLinkData] = useState<any>(null);
 
+  // Histórico de ações
+  const [actionHistory, setActionHistory] = useState<any[]>([]);
+
   useEffect(() => {
     if (params.id) {
       fetchBudget();
+      fetchActionHistory();
 
       // Polling só é necessário quando status indica aguardando pagamento
       // Intervalo aumentado para 10s para reduzir requisições desnecessárias
@@ -245,6 +276,174 @@ export default function OrcamentoDetalhesPage() {
     }
   };
 
+  const fetchActionHistory = async () => {
+    try {
+      const response = await fetch(`/api/orcamentos/${params.id}`);
+      if (!response.ok) return;
+      const data = await response.json();
+
+      // Construir histórico baseado nos dados do orçamento
+      const history: any[] = [];
+
+      // Data de criação
+      history.push({
+        id: 'created',
+        action: 'Orçamento Criado',
+        date: data.createdAt,
+        icon: 'file',
+        status: 'completed'
+      });
+
+      // Status sent
+      if (data.status !== 'pending' && data.approvalToken) {
+        history.push({
+          id: 'sent',
+          action: 'Proposta Enviada',
+          date: data.updatedAt,
+          icon: 'send',
+          status: 'completed'
+        });
+      }
+
+      // Status accepted / user_approved
+      if (['accepted', 'user_approved', 'contract_sent', 'contract_signed', 'down_payment_sent', 'down_payment_paid', 'project_in_progress', 'final_payment_sent', 'final_payment_paid', 'completed'].includes(data.status)) {
+        history.push({
+          id: 'approved',
+          action: 'Proposta Aprovada',
+          date: data.updatedAt,
+          icon: 'check',
+          status: 'completed'
+        });
+      }
+
+      // Contrato criado
+      if (data.contract) {
+        history.push({
+          id: 'contract_created',
+          action: 'Contrato Criado',
+          date: data.contract.createdAt,
+          icon: 'file-signature',
+          status: 'completed'
+        });
+      }
+
+      // Contrato enviado
+      if (data.contract?.sentAt) {
+        history.push({
+          id: 'contract_sent',
+          action: 'Contrato Enviado',
+          date: data.contract.sentAt,
+          icon: 'send',
+          status: 'completed'
+        });
+      }
+
+      // Contrato assinado
+      if (data.contract?.signedByClientAt || data.status === 'contract_signed') {
+        history.push({
+          id: 'contract_signed',
+          action: 'Contrato Assinado',
+          date: data.contract?.signedByClientAt || data.updatedAt,
+          icon: 'signature',
+          status: 'completed'
+        });
+      }
+
+      // Contrato confirmado
+      if (data.contract?.confirmed) {
+        history.push({
+          id: 'contract_confirmed',
+          action: 'Contrato Confirmado',
+          date: data.contract.updatedAt,
+          icon: 'check-circle',
+          status: 'completed'
+        });
+      }
+
+      // Pagamento da entrada enviado
+      if (data.status === 'down_payment_sent' || ['down_payment_paid', 'project_in_progress', 'final_payment_sent', 'final_payment_paid', 'completed'].includes(data.status)) {
+        const paymentDate = data.contract?.updatedAt || data.updatedAt;
+        history.push({
+          id: 'payment_sent',
+          action: 'Link de Pagamento Enviado',
+          date: paymentDate,
+          icon: 'dollar',
+          status: 'completed'
+        });
+      }
+
+      // Pagamento da entrada pago
+      if (['down_payment_paid', 'project_in_progress', 'final_payment_sent', 'final_payment_paid', 'completed'].includes(data.status)) {
+        history.push({
+          id: 'down_payment_paid',
+          action: 'Entrada Paga',
+          date: data.updatedAt,
+          icon: 'credit-card',
+          status: 'completed'
+        });
+      }
+
+      // Projeto iniciado
+      if (data.projectId || data.status === 'project_in_progress' || data.status === 'completed') {
+        history.push({
+          id: 'project_started',
+          action: 'Projeto Iniciado',
+          date: data.startDate || data.updatedAt,
+          icon: 'rocket',
+          status: data.status === 'completed' ? 'completed' : 'current'
+        });
+      }
+
+      // Projeto em andamento
+      if (data.status === 'project_in_progress') {
+        history.push({
+          id: 'project_in_progress',
+          action: 'Projeto em Andamento',
+          date: data.updatedAt,
+          icon: 'activity',
+          status: 'current'
+        });
+      }
+
+      // Pagamento final enviado
+      if (['final_payment_sent', 'final_payment_paid', 'completed'].includes(data.status)) {
+        history.push({
+          id: 'final_payment_sent',
+          action: 'Cobrança Final Enviada',
+          date: data.updatedAt,
+          icon: 'send',
+          status: 'completed'
+        });
+      }
+
+      // Pagamento final pago
+      if (['final_payment_paid', 'completed'].includes(data.status)) {
+        history.push({
+          id: 'final_payment_paid',
+          action: 'Pagamento Final Pago',
+          date: data.updatedAt,
+          icon: 'credit-card',
+          status: 'completed'
+        });
+      }
+
+      // Projeto concluído
+      if (data.status === 'completed') {
+        history.push({
+          id: 'completed',
+          action: 'Projeto Concluído',
+          date: data.updatedAt,
+          icon: 'check-circle',
+          status: 'completed'
+        });
+      }
+
+      setActionHistory(history);
+    } catch (error) {
+      console.error("Erro ao buscar histórico:", error);
+    }
+  };
+
   const handleApprove = async () => {
     try {
       setIsSending(true);
@@ -302,6 +501,7 @@ export default function OrcamentoDetalhesPage() {
       const updateData: any = {
         finalValue,
         timeline: editTimeline,
+        technologies: JSON.stringify(editTechnologies),
       };
 
       // Adicionar data de início se fornecida
@@ -614,14 +814,22 @@ export default function OrcamentoDetalhesPage() {
               {/* Status: pending */}
               {budget.status === "pending" && (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => setIsApproveDialogOpen(true)}>
-                    <Send className="h-4 w-4 mr-1" />Enviar Proposta
-                  </Button>
+                  {budget.startDate && Array.isArray(budget.technologies) && budget.technologies.length > 0 ? (
+                    <Button variant="outline" size="sm" onClick={() => setIsApproveDialogOpen(true)}>
+                      <Send className="h-4 w-4 mr-1" />Enviar Proposta
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-xs">
+                      <Info className="h-3.5 w-3.5" />
+                      <span>Configure a <strong>Data de Início</strong> e <strong>Tecnologias</strong> para enviar</span>
+                    </div>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => {
                     const budgetValue = budget.finalValue || 0;
                     setEditFinalValue(budgetValue.toString());
                     setFormattedBudget(formatCurrency(budgetValue));
                     setEditTimeline(budget.timeline || "");
+                    setEditTechnologies(Array.isArray(budget.technologies) ? budget.technologies : []);
                     // Formatar data de início se existir (YYYY-MM-DD)
                     if (budget.startDate) {
                       const d = new Date(budget.startDate);
@@ -728,6 +936,98 @@ export default function OrcamentoDetalhesPage() {
             </div>
           </div>
         </div>
+
+        {/* Timeline de Progresso do Orçamento */}
+        <Card className="mb-8 border-0 shadow-md overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Activity className="h-6 w-6" />
+                <div>
+                  <CardTitle className="text-lg">Andamento do Orçamento</CardTitle>
+                  <CardDescription className="text-indigo-100">
+                    {statusLabels[budget.status]} • {new Date(budget.createdAt).toLocaleDateString("pt-BR")}
+                  </CardDescription>
+                </div>
+              </div>
+              <Badge className="bg-white/20 text-white border-0">
+                {actionHistory.filter(a => a.status === 'completed').length} de {actionHistory.length} etapas concluídas
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="relative">
+              {/* Linha de progresso horizontal */}
+              <div className="flex items-center justify-between relative z-10">
+                {actionHistory.map((item, index) => {
+                  const isCompleted = item.status === 'completed';
+                  const isCurrent = item.status === 'current';
+                  const isLast = index === actionHistory.length - 1;
+
+                  return (
+                    <div key={item.id} className="flex flex-col items-center flex-1">
+                      {/* Ícone/Círculo */}
+                      <div className={`relative w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isCompleted
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : isCurrent
+                          ? 'bg-indigo-500 border-indigo-500 text-white animate-pulse'
+                          : 'bg-slate-100 border-slate-300 text-slate-400'
+                        }`}>
+                        {isCompleted ? (
+                          <CheckCircle className="h-5 w-5" />
+                        ) : isCurrent ? (
+                          <Activity className="h-5 w-5" />
+                        ) : (
+                          <Circle className="h-5 w-5" />
+                        )}
+
+                        {/* Tooltip com detalhes */}
+                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-0 hover:opacity-100 transition-opacity bg-slate-900 text-white text-xs px-3 py-1.5 rounded whitespace-nowrap z-20 pointer-events-none">
+                          {item.action}
+                          {item.date && (
+                            <div className="text-[10px] text-slate-300 mt-0.5">
+                              {new Date(item.date).toLocaleDateString("pt-BR")} às {new Date(item.date).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
+                          <div className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
+                        </div>
+                      </div>
+
+                      {/* Linha conectora */}
+                      {!isLast && (
+                        <div className={`absolute top-5 left-[${(index + 1) * (100 / actionHistory.length) - (100 / actionHistory.length / 2)}%] w-[${100 / actionHistory.length - 5}%] h-0.5 transition-colors duration-300 ${isCompleted ? 'bg-green-500' : 'bg-slate-200'
+                          }`} style={{
+                            width: `calc(${100 / actionHistory.length}% - 40px)`,
+                            left: `calc(${index * (100 / actionHistory.length)}% + 20px)`
+                          }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Labels das etapas */}
+              <div className="flex justify-between mt-4">
+                {actionHistory.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex-1 text-center"
+                    style={{ maxWidth: `${100 / actionHistory.length}%` }}
+                  >
+                    <p className={`text-[10px] font-medium truncate px-1 ${item.status === 'completed'
+                      ? 'text-green-600'
+                      : item.status === 'current'
+                        ? 'text-indigo-600 font-semibold'
+                        : 'text-slate-400'
+                      }`}>
+                      {item.action}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -849,7 +1149,7 @@ export default function OrcamentoDetalhesPage() {
         </Card>
 
         {/* Informações */}
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-3 mb-8">
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
@@ -976,6 +1276,26 @@ export default function OrcamentoDetalhesPage() {
                   </>
                 )}
 
+                {/* Tecnologias */}
+                {(budget.technologies || budget.contract?.metadata?.project?.technologies) && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium mb-3 flex items-center gap-2">
+                        <Rocket className="h-4 w-4" />
+                        Tecnologias do Projeto ({(Array.isArray(budget.technologies) ? budget.technologies.length : 0) || (Array.isArray(budget.contract?.metadata?.project?.technologies) ? budget.contract.metadata.project.technologies.length : 0)})
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1 font-sans">
+                        {(Array.isArray(budget.technologies) ? budget.technologies : (budget.contract?.metadata?.project?.technologies || [])).map((tech: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="pl-3 pr-3 py-1 bg-indigo-50 text-indigo-700 border-indigo-100">
+                            {tech}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 {/* Descrição */}
                 {budget.details && (
                   <>
@@ -1018,6 +1338,15 @@ export default function OrcamentoDetalhesPage() {
                     <p className="text-base font-semibold text-amber-900">{budget.timeline ? getTimelineInWeeks(budget.timeline) : "—"}</p>
                   </div>
                 </div>
+                <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-700 font-medium">Data Prevista de Entrega</p>
+                    <p className="text-base font-semibold text-blue-900">{getExpectedDeliveryDate()}</p>
+                  </div>
+                </div>
                 <Separator />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-start gap-2">
@@ -1058,6 +1387,217 @@ export default function OrcamentoDetalhesPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Card de Histórico de Ações e Ações Rápidas */}
+        <div className="grid gap-6 md:grid-cols-2 mb-8">
+          {/* Histórico de Ações */}
+          <Card className="border-0 shadow-md">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <History className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Histórico de Ações</CardTitle>
+                  <CardDescription>Todas as etapas percorridas até agora</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {actionHistory.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <History className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma ação registrada</p>
+                  </div>
+                ) : (
+                  actionHistory.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${item.status === 'current'
+                        ? 'bg-indigo-50 border-indigo-200'
+                        : 'bg-slate-50 border-slate-100'
+                        }`}
+                    >
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${item.status === 'completed'
+                        ? 'bg-green-100 text-green-600'
+                        : 'bg-indigo-100 text-indigo-600'
+                        }`}>
+                        {item.icon === 'file' && <FileText className="h-4 w-4" />}
+                        {item.icon === 'send' && <Send className="h-4 w-4" />}
+                        {item.icon === 'check' && <CheckCircle className="h-4 w-4" />}
+                        {item.icon === 'file-signature' && <FileSignature className="h-4 w-4" />}
+                        {item.icon === 'signature' && <Edit2 className="h-4 w-4" />}
+                        {item.icon === 'check-circle' && <CheckCircle2 className="h-4 w-4" />}
+                        {item.icon === 'dollar' && <DollarSign className="h-4 w-4" />}
+                        {item.icon === 'credit-card' && <CreditCard className="h-4 w-4" />}
+                        {item.icon === 'rocket' && <Rocket className="h-4 w-4" />}
+                        {item.icon === 'activity' && <Activity className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900">{item.action}</p>
+                        <p className="text-xs text-slate-500">
+                          {item.date ? new Date(item.date).toLocaleDateString("pt-BR", {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '—'}
+                        </p>
+                      </div>
+                      {item.status === 'current' && (
+                        <Badge variant="outline" className="bg-indigo-100 text-indigo-700 border-indigo-200 text-[10px]">
+                          Atual
+                        </Badge>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Ações Rápidas (Reutilizar) */}
+          <Card className="border-0 shadow-md">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <RefreshCcw className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Ações Rápidas</CardTitle>
+                  <CardDescription>Reutilize ações já realizadas</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {/* Enviar Proposta Novamente */}
+                {budget.approvalToken && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 h-auto py-3"
+                    onClick={() => {
+                      const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/orcamento/aprovar/${budget.approvalToken}`;
+                      copyToClipboard(approvalUrl, "Link de aprovação copiado!");
+                    }}
+                  >
+                    <Send className="h-4 w-4 text-blue-600" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Copiar Link de Aprovação</p>
+                      <p className="text-xs text-slate-500">Compartilhe o link de aprovação com o cliente</p>
+                    </div>
+                  </Button>
+                )}
+
+                {/* Reenviar Contrato */}
+                {budget.contract && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 h-auto py-3"
+                    onClick={() => router.push(`/dashboard/orcamentos/${params.id}/contrato`)}
+                  >
+                    <FileSignature className="h-4 w-4 text-indigo-600" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Gerenciar Contrato</p>
+                      <p className="text-xs text-slate-500">Visualizar, editar ou reenviar contrato</p>
+                    </div>
+                  </Button>
+                )}
+
+                {/* Enviar Link de Pagamento */}
+                {budget.contract?.confirmed && budget.status !== 'down_payment_paid' && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 h-auto py-3"
+                    onClick={handleGeneratePaymentLink}
+                  >
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Enviar Cobrança (25%)</p>
+                      <p className="text-xs text-slate-500">Cobrar entrada do projeto</p>
+                    </div>
+                  </Button>
+                )}
+
+                {/* Iniciar Projeto */}
+                {budget.status === 'down_payment_paid' && !budget.projectId && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 h-auto py-3"
+                    onClick={handleStartProject}
+                  >
+                    <Rocket className="h-4 w-4 text-purple-600" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Iniciar Projeto</p>
+                      <p className="text-xs text-slate-500">Criar projeto e começar produção</p>
+                    </div>
+                  </Button>
+                )}
+
+                {/* Ver Projeto */}
+                {budget.projectId && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 h-auto py-3"
+                    onClick={() => router.push(`/dashboard/projetos/${budget.projectId}`)}
+                  >
+                    <FileText className="h-4 w-4 text-cyan-600" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Acessar Projeto</p>
+                      <p className="text-xs text-slate-500">Ver detalhes e andamento do projeto</p>
+                    </div>
+                  </Button>
+                )}
+
+                {/* Editar Valor/Prazo */}
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 h-auto py-3"
+                  onClick={() => {
+                    const budgetValue = budget.finalValue || 0;
+                    setEditFinalValue(budgetValue.toString());
+                    setFormattedBudget(formatCurrency(budgetValue));
+                    setEditTimeline(budget.timeline || "");
+                    setEditTechnologies(Array.isArray(budget.technologies) ? budget.technologies : []);
+                    if (budget.startDate) {
+                      const d = new Date(budget.startDate);
+                      const year = d.getFullYear();
+                      const month = String(d.getMonth() + 1).padStart(2, "0");
+                      const day = String(d.getDate()).padStart(2, "0");
+                      setEditStartDate(`${year}-${month}-${day}`);
+                    } else {
+                      setEditStartDate("");
+                    }
+                    setIsEditValueDialogOpen(true);
+                  }}
+                >
+                  <Edit2 className="h-4 w-4 text-orange-600" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium">Editar Valor/Prazo</p>
+                    <p className="text-xs text-slate-500">Atualizar valor final ou prazo de entrega</p>
+                  </div>
+                </Button>
+
+                {/* Duplicar Orçamento */}
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 h-auto py-3"
+                  onClick={() => {
+                    router.push(`/orcamento?duplicate=${budget.id}`);
+                  }}
+                >
+                  <Copy className="h-4 w-4 text-emerald-600" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium">Duplicar Orçamento</p>
+                    <p className="text-xs text-slate-500">Criar novo orçamento baseado neste</p>
+                  </div>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Dialogs */}
@@ -1175,6 +1715,74 @@ export default function OrcamentoDetalhesPage() {
                 <p className="text-xs text-muted-foreground">
                   Data prevista para início do projeto (opcional)
                 </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label>Tecnologias do Projeto</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Ex: React, Node.js"
+                    value={techInput}
+                    onChange={(e) => setTechInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (techInput.trim()) {
+                          setEditTechnologies([...editTechnologies, techInput.trim()]);
+                          setTechInput("");
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    type="button"
+                    onClick={() => {
+                      if (techInput.trim()) {
+                        setEditTechnologies([...editTechnologies, techInput.trim()]);
+                        setTechInput("");
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1 font-sans">
+                  {editTechnologies.map((tech, index) => (
+                    <Badge key={index} variant="secondary" className="pl-2 pr-1 py-1 gap-1">
+                      {tech}
+                      <button
+                        onClick={() => setEditTechnologies(editTechnologies.filter((_, i) => i !== index))}
+                        className="rounded-full hover:bg-muted p-0.5"
+                        type="button"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+
+                <div className="space-y-2 mt-2">
+                  <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Sugestões Rápidas</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {["React", "Next.js", "Node.js", "TypeScript", "Tailwind CSS", "Prisma", "PostgreSQL", "Stripe", "Auth.js", "Vercel"].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => {
+                          if (!editTechnologies.includes(suggestion)) {
+                            setEditTechnologies([...editTechnologies, suggestion]);
+                          }
+                        }}
+                        className="text-[10px] px-2 py-0.5 rounded border bg-slate-50 hover:bg-slate-100 transition-colors"
+                      >
+                        + {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800 font-medium">Condições de Pagamento</p>

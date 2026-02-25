@@ -37,6 +37,7 @@ export async function GET(
             signedAt: true,
             documentUrl: true,
             content: true,
+            metadata: true,
           },
         },
         payments: true,
@@ -80,7 +81,7 @@ export async function PUT(
 
     // Verificar se é uma alteração de orçamento (não apenas status)
     const isChangeRequest = body.changeReason !== undefined;
-    
+
     if (isChangeRequest) {
       // Justificativa é obrigatória para alteração
       if (!body.changeReason || !Object.values(Select).includes(body.changeReason)) {
@@ -93,7 +94,7 @@ export async function PUT(
 
     // Verificar se é uma exclusão com justificativa
     const isDeletionRequest = body.deletionReason !== undefined;
-    
+
     if (isDeletionRequest) {
       // Justificativa é obrigatória para exclusão
       if (!body.deletionReason || !Object.values(Select).includes(body.deletionReason)) {
@@ -104,9 +105,33 @@ export async function PUT(
       }
     }
 
+    // Tratar campos JSON - parsear strings JSON para objetos
+    const updateData: any = { ...body };
+    if (body.technologies && typeof body.technologies === "string") {
+      try {
+        updateData.technologies = JSON.parse(body.technologies);
+      } catch (e) {
+        // Se não for JSON válido, manter como está
+      }
+    }
+    if (body.features && typeof body.features === "string") {
+      try {
+        updateData.features = JSON.parse(body.features);
+      } catch (e) {
+        // Se não for JSON válido, manter como está
+      }
+    }
+    if (body.integrations && typeof body.integrations === "string") {
+      try {
+        updateData.integrations = JSON.parse(body.integrations);
+      } catch (e) {
+        // Se não for JSON válido, manter como está
+      }
+    }
+
     const budget = await prisma.budget.update({
       where: { id },
-      data: body,
+      data: updateData,
     });
 
     return NextResponse.json(budget);
@@ -160,9 +185,9 @@ export async function DELETE(
       where: { id },
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      message: "Orçamento excluído com sucesso" 
+      message: "Orçamento excluído com sucesso"
     });
   } catch (error) {
     console.error("Erro ao excluir orçamento:", error);
