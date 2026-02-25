@@ -109,6 +109,8 @@ model Project {
   dueDate     DateTime?
   startDate   DateTime? // Data de início do projeto
   completedAt DateTime?
+  gitRepositoryUrl String? // URL do repositório Git
+  testUrl String? // URL de teste do projeto (staging, preview)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

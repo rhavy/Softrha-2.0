@@ -21,7 +21,7 @@ export async function POST(
 
     const { id: projectId } = await params;
     const body = await request.json();
-    const { progress, sendEmail = true, sendWhatsApp = false, customMessage } = body;
+    const { progress, sendEmail = true, sendWhatsApp = false, customMessage, gitRepositoryUrl, testUrl } = body;
 
     // Validar progresso
     const validProgressValues = [20, 50, 70, 100];
@@ -50,6 +50,27 @@ export async function POST(
         { error: "Projeto não encontrado" },
         { status: 404 }
       );
+    }
+
+    // Se recebeu URLs e o progresso é 100%, salvar no projeto
+    if (progress === 100) {
+      const updateData: any = {};
+      
+      if (gitRepositoryUrl?.trim()) {
+        updateData.gitRepositoryUrl = gitRepositoryUrl.trim();
+      }
+      
+      if (testUrl !== undefined) {
+        updateData.testUrl = testUrl?.trim() || null;
+      }
+      
+      if (Object.keys(updateData).length > 0) {
+        await prisma.project.update({
+          where: { id: projectId },
+          data: updateData,
+        });
+        console.log("[Notificação] URLs salvas:", { gitRepositoryUrl, testUrl });
+      }
     }
 
     console.log("[Notificação] Projeto encontrado:", {

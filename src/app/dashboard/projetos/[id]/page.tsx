@@ -4,6 +4,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -35,6 +36,9 @@ import {
   ExternalLink,
   Video,
   ChevronRight,
+  Code,
+  GitBranch,
+  Globe,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +68,9 @@ interface Project {
   progress: number;
   dueDate: string | null;
   startDate?: string | null;
+  completedAt?: string | null;
+  gitRepositoryUrl?: string | null;
+  testUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   client?: {
@@ -151,6 +158,8 @@ export default function ProjetoDetalhesPage() {
   const [failureDescription, setFailureDescription] = useState("");
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<any>(null);
   const [isHistoryDetailDialogOpen, setIsHistoryDetailDialogOpen] = useState(false);
+  const [gitRepositoryUrl, setGitRepositoryUrl] = useState("");
+  const [testUrl, setTestUrl] = useState("");
 
   // Mapear motivos técnicos para texto legível
   const getReasonLabel = (reason: string) => {
@@ -424,16 +433,48 @@ export default function ProjetoDetalhesPage() {
 
       const progress = stageToProgress[stage] || 50;
 
+      // Preparar dados para envio
+      const notifyData: any = {
+        progress,
+        sendEmail: notifyEmail,
+        sendWhatsApp: notifyWhatsApp,
+      };
+
+      // Se for projeto concluído, enviar URLs
+      if (stage === "completed") {
+        // Git URL (obrigatório)
+        if (gitRepositoryUrl.trim()) {
+          notifyData.gitRepositoryUrl = gitRepositoryUrl.trim();
+        }
+        // Test URL (opcional)
+        if (testUrl.trim()) {
+          notifyData.testUrl = testUrl.trim();
+        }
+      }
+
       const response = await fetch(`/api/projetos/${params.id}/notificar-evolucao`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ progress, sendEmail: notifyEmail, sendWhatsApp: notifyWhatsApp }),
+        body: JSON.stringify(notifyData),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.error || "Erro ao notificar evolução");
+      }
+
+      // Se URLs foram salvas, atualizar projeto localmente
+      if (stage === "completed") {
+        if (gitRepositoryUrl.trim()) {
+          setProject((prev) => prev ? {
+            ...prev,
+            gitRepositoryUrl: gitRepositoryUrl.trim(),
+            testUrl: testUrl.trim() || null,
+          } : null);
+        }
+        setGitRepositoryUrl(""); // Limpar input
+        setTestUrl(""); // Limpar input
       }
 
       // Verificar resultados
@@ -443,7 +484,7 @@ export default function ProjetoDetalhesPage() {
       } else if (notifyEmail && result.emailError) {
         notifications.push(`E-mail: ${result.emailError}`);
       }
-      
+
       if (result.whatsappUrl) {
         notifications.push("WhatsApp pronto");
         // Abrir WhatsApp em nova aba
@@ -1028,6 +1069,116 @@ export default function ProjetoDetalhesPage() {
                     <p className="font-medium capitalize">{statusLabels[project.status]}</p>
                   </div>
                 </div>
+
+                {/* Repositório Git e URL de Teste - aparece apenas quando projeto está concluído e tem URL */}
+                {(project.gitRepositoryUrl || project.testUrl) && (
+                  <>
+                    <Separator />
+                    <div className="space-y-4">
+                      {/* Git URL */}
+                      {project.gitRepositoryUrl && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <GitBranch className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm font-semibold">Repositório do Projeto</p>
+                          </div>
+                          <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <Code className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                            <a
+                              href={project.gitRepositoryUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex-1 truncate"
+                            >
+                              {project.gitRepositoryUrl}
+                            </a>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => {
+                                if (project.gitRepositoryUrl) {
+                                  navigator.clipboard.writeText(project.gitRepositoryUrl);
+                                  toast({
+                                    title: "Copiado!",
+                                    description: "URL do repositório copiada",
+                                  });
+                                }
+                              }}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => {
+                                if (project.gitRepositoryUrl) {
+                                  window.open(project.gitRepositoryUrl, "_blank");
+                                }
+                              }}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Test URL */}
+                      {project.testUrl && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm font-semibold">URL de Teste</p>
+                            <Badge variant="secondary" className="text-[10px]">Preview</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
+                            <Globe className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                            <a
+                              href={project.testUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-emerald-700 dark:text-emerald-400 hover:underline flex-1 truncate"
+                            >
+                              {project.testUrl}
+                            </a>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => {
+                                if (project.testUrl) {
+                                  navigator.clipboard.writeText(project.testUrl);
+                                  toast({
+                                    title: "Copiado!",
+                                    description: "URL de teste copiada",
+                                  });
+                                }
+                              }}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => {
+                                if (project.testUrl) {
+                                  window.open(project.testUrl, "_blank");
+                                }
+                              }}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            🚀 Ambiente de teste/staging para visualização do cliente
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {project.description && (
                   <>
@@ -1921,6 +2072,77 @@ export default function ProjetoDetalhesPage() {
                 </Button>
               </div>
 
+              {/* Inputs de URLs - aparece apenas quando Projeto Concluído é selecionado */}
+              {selectedStage === "completed" && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-3 pt-2"
+                >
+                  {/* Git URL - Obrigatório */}
+                  <div className="space-y-2">
+                    <Label htmlFor="gitUrl" className="font-semibold text-sm flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        📦 Repositório do Projeto
+                        <span className="text-xs text-red-600">*</span>
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto text-xs text-muted-foreground hover:text-muted-foreground"
+                        onClick={() => {
+                          setGitRepositoryUrl("https://github.com/teste/projeto-exemplo");
+                        }}
+                      >
+                        Inserir URL de Teste
+                      </Button>
+                    </Label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                        <Code className="h-4 w-4" />
+                      </div>
+                      <Input
+                        id="gitUrl"
+                        placeholder="https://github.com/usuario/projeto"
+                        value={gitRepositoryUrl}
+                        onChange={(e) => setGitRepositoryUrl(e.target.value)}
+                        className={`pl-10 ${!gitRepositoryUrl.trim() ? 'border-red-300 focus-visible:ring-red-300' : ''}`}
+                      />
+                    </div>
+                    {!gitRepositoryUrl.trim() && (
+                      <p className="text-xs text-red-600 flex items-center gap-1">
+                        <span className="font-semibold">Obrigatório:</span> Informe a URL do repositório
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Test URL - Opcional */}
+                  <div className="space-y-2">
+                    <Label htmlFor="testUrl" className="font-semibold text-sm flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      URL de Teste do Projeto
+                      <Badge variant="secondary" className="text-[10px] font-normal">Opcional</Badge>
+                    </Label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                        <Globe className="h-4 w-4" />
+                      </div>
+                      <Input
+                        id="testUrl"
+                        placeholder="https://projeto-teste.vercel.app ou https://staging.example.com"
+                        value={testUrl}
+                        onChange={(e) => setTestUrl(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      URL onde o cliente pode visualizar/testar o projeto (Vercel, Netlify, servidor de staging, etc.)
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Opções de Envio */}
               <div className="space-y-3 pt-2">
                 <Label className="text-sm font-semibold">Enviar notificação por:</Label>
@@ -1961,12 +2183,21 @@ export default function ProjetoDetalhesPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsNotificationDialogOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsNotificationDialogOpen(false);
+                setGitRepositoryUrl("");
+                setTestUrl("");
+              }}>
                 Cancelar
               </Button>
               <Button
                 onClick={() => selectedStage && handleNotifyProgress(selectedStage)}
-                disabled={!selectedStage || isNotifyingProgress || (!notifyEmail && !notifyWhatsApp)}
+                disabled={
+                  !selectedStage || 
+                  isNotifyingProgress || 
+                  (!notifyEmail && !notifyWhatsApp) ||
+                  (selectedStage === "completed" && !gitRepositoryUrl.trim())
+                }
               >
                 {isNotifyingProgress ? "Enviando..." : "Notificar Cliente"}
               </Button>
