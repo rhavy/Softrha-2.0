@@ -48,6 +48,7 @@ import {
   StepForward,
   History,
   RefreshCcw,
+  QrCode,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -2095,6 +2096,31 @@ export default function OrcamentoDetalhesPage() {
                 </div>
               )}
 
+              {/* Métodos de Pagamento Disponíveis */}
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-indigo-900 mb-3">Métodos de Pagamento Disponíveis:</p>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-3">
+                    <div className="h-6 w-6 rounded-full bg-indigo-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CreditCard className="h-3.5 w-3.5 text-indigo-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-indigo-900">Cartão de Crédito</p>
+                      <p className="text-xs text-indigo-700">Parcelamento em até 12x • Todas as bandeiras</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 opacity-60">
+                    <div className="h-6 w-6 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <QrCode className="h-3.5 w-3.5 text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">PIX (Em breve)</p>
+                      <p className="text-xs text-slate-400">Aprovação imediata • Disponível em breve</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Link de Pagamento */}
               {paymentLink && (
                 <div className="space-y-3">
@@ -2137,6 +2163,7 @@ export default function OrcamentoDetalhesPage() {
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <strong>Como usar:</strong> Copie o link e envie para o cliente por e-mail ou WhatsApp.
+                  O cliente poderá pagar com Cartão de Crédito em até 12x.
                   Após o pagamento, o status será atualizado automaticamente.
                 </p>
               </div>

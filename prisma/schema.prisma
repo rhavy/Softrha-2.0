@@ -271,10 +271,12 @@ model Schedule {
   date            DateTime // Data do agendamento
   time            String   // Horário do agendamento (HH:mm)
   type            String   // video, audio
-  status          String   @default("scheduled") // scheduled, completed, cancelled, rescheduled
+  status          String   @default("scheduled") // scheduled, completed, cancelled, rescheduled, pending_reschedule
   meetingLink     String?  // Link da reunião (Google Meet, Zoom, etc.)
   notes           String?  @db.Text // Observações adicionais
   rescheduleReason String? @db.Text // Motivo do reagendamento (se houver)
+  cancellationReason String? @db.Text // Motivo do cancelamento (se houver)
+  history         Json?    // Histórico de tentativas [{date, time, type, status, reason, createdAt}]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

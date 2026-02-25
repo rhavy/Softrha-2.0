@@ -97,7 +97,7 @@ export async function POST(
       });
     }
 
-    // Gerar link de pagamento (SEM projeto ainda)
+    // Gerar link de pagamento com PIX e Cartão
     const paymentLink = await generatePaymentLink(
       downPayment,
       `Entrada 25% - ${budget.projectType} - ${budget.clientName}`,

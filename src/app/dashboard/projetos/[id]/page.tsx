@@ -29,6 +29,12 @@ import {
   Send,
   Rocket,
   Phone,
+  Activity,
+  Building,
+  MapPin,
+  ExternalLink,
+  Video,
+  ChevronRight,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -57,8 +63,15 @@ interface Project {
   clientPhone?: string;
   progress: number;
   dueDate: string | null;
+  startDate?: string | null;
   createdAt: string;
   updatedAt: string;
+  client?: {
+    id: string;
+    name: string;
+    emails?: string | null;
+    phones?: string | null;
+  } | null;
 }
 
 interface Payment {
@@ -116,13 +129,16 @@ export default function ProjetoDetalhesPage() {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [finalPayment, setFinalPayment] = useState<Payment | null>(null);
   const [schedule, setSchedule] = useState<any>(null);
+  const [budget, setBudget] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [isNotifyingProgress, setIsNotifyingProgress] = useState(false);
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
-  const [selectedProgress, setSelectedProgress] = useState<number | null>(null);
+  const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [notifyEmail, setNotifyEmail] = useState(true);
+  const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
   const [isFinalPaymentDialogOpen, setIsFinalPaymentDialogOpen] = useState(false);
   const [isSendingFinalPayment, setIsSendingFinalPayment] = useState(false);
   const [finalPaymentLink, setFinalPaymentLink] = useState<string | null>(null);
@@ -133,6 +149,35 @@ export default function ProjetoDetalhesPage() {
   const [scheduleSuccess, setScheduleSuccess] = useState<boolean | null>(null);
   const [failureReason, setFailureReason] = useState("");
   const [failureDescription, setFailureDescription] = useState("");
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<any>(null);
+  const [isHistoryDetailDialogOpen, setIsHistoryDetailDialogOpen] = useState(false);
+
+  // Mapear motivos técnicos para texto legível
+  const getReasonLabel = (reason: string) => {
+    const reasonMap: Record<string, string> = {
+      cliente_desistiu: 'O cliente desistiu do projeto',
+      cliente_nao_respondeu: 'Não obtivemos resposta do cliente',
+      erro_tecnico: 'Erro técnico na entrega',
+      agenda_incompativel: 'Agenda incompatível com o cliente',
+      pagamento_pendente: 'Pagamento pendente',
+      escopo_alterado: 'Escopo do projeto foi alterado',
+      problemas_comunicacao: 'Problemas de comunicação',
+      cliente_indisponivel: 'Cliente indisponível no período',
+      equipe_indisponivel: 'Equipe indisponível no período',
+      problemas_tecnicos_internos: 'Problemas técnicos internos',
+      outro: 'Outro motivo',
+    };
+    return reasonMap[reason] || reason;
+  };
+
+  // Formatador de motivo para exibição
+  const formatReason = (reason: string) => {
+    if (!reason) return '—';
+    // Se for um código conhecido, retorna o texto formatado
+    const label = getReasonLabel(reason);
+    // Capitalizar primeira letra
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
 
   useEffect(() => {
     if (params.id) {
@@ -153,29 +198,33 @@ export default function ProjetoDetalhesPage() {
       // Prioridade: client.phones > data.clientPhone > budget.clientPhone
       let clientPhone = data.client?.phones?.[0]?.value || data.clientPhone;
 
-      // Se não tem telefone, buscar do budget
-      if (!clientPhone && data.budgetId) {
+      // Buscar budget para obter dados completos do cliente
+      let budgetData = null;
+      if (data.budgetId) {
         try {
           const budgetResponse = await fetch(`/api/orcamentos/${data.budgetId}`);
           if (budgetResponse.ok) {
-            const budgetData = await budgetResponse.json();
-            clientPhone = budgetData.clientPhone;
-            console.log("[DEBUG] Telefone obtido do budget:", clientPhone);
+            budgetData = await budgetResponse.json();
+            if (!clientPhone) {
+              clientPhone = budgetData.clientPhone;
+            }
+            console.log("[DEBUG] Budget obtido:", budgetData);
           }
         } catch (e) {
-          console.warn("Erro ao buscar budget para telefone:", e);
+          console.warn("Erro ao buscar budget:", e);
         }
       }
 
       const projectData = {
         ...data,
-        clientEmail: data.client?.emails?.[0]?.value || data.clientEmail,
+        clientEmail: data.client?.emails?.[0]?.value || data.clientEmail || budgetData?.clientEmail,
         clientPhone: clientPhone,
       };
 
       console.log("[DEBUG] Projeto com telefone:", projectData.clientPhone);
 
       setProject(projectData);
+      setBudget(budgetData);
 
       // Buscar pagamento se existir
       if (data.budgetId) {
@@ -361,14 +410,24 @@ export default function ProjetoDetalhesPage() {
     }
   };
 
-  const handleNotifyProgress = async (progress: number) => {
+  const handleNotifyProgress = async (stage: string) => {
     try {
       setIsNotifyingProgress(true);
+
+      // Mapear etapa para porcentagem
+      const stageToProgress: Record<string, number> = {
+        started: 20,
+        in_progress: 50,
+        almost_done: 70,
+        completed: 100,
+      };
+
+      const progress = stageToProgress[stage] || 50;
 
       const response = await fetch(`/api/projetos/${params.id}/notificar-evolucao`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ progress, sendEmail: true, sendWhatsApp: false }),
+        body: JSON.stringify({ progress, sendEmail: notifyEmail, sendWhatsApp: notifyWhatsApp }),
       });
 
       const result = await response.json();
@@ -377,13 +436,29 @@ export default function ProjetoDetalhesPage() {
         throw new Error(result.error || "Erro ao notificar evolução");
       }
 
+      // Verificar resultados
+      const notifications = [];
+      if (result.emailSent) {
+        notifications.push("E-mail enviado");
+      } else if (notifyEmail && result.emailError) {
+        notifications.push(`E-mail: ${result.emailError}`);
+      }
+      
+      if (result.whatsappUrl) {
+        notifications.push("WhatsApp pronto");
+        // Abrir WhatsApp em nova aba
+        window.open(result.whatsappUrl, "_blank");
+      } else if (notifyWhatsApp && !result.whatsappUrl) {
+        notifications.push("WhatsApp: telefone não disponível");
+      }
+
       toast({
-        title: "Notificação enviada!",
-        description: `Cliente notificado sobre ${progress}% de evolução do projeto`,
+        title: "Notificação processada!",
+        description: notifications.join(" • "),
       });
 
       setIsNotificationDialogOpen(false);
-      setSelectedProgress(null);
+      setSelectedStage(null);
       fetchProject();
     } catch (error) {
       toast({
@@ -416,15 +491,26 @@ export default function ProjetoDetalhesPage() {
         setFinalPaymentLink(result.paymentLink);
       }
 
-      toast({
-        title: "Pagamento final enviado!",
-        description: "Link de pagamento final enviado com sucesso",
-      });
-
-      // Abrir WhatsApp se solicitado
-      if (sendWhatsApp && result.whatsappUrl) {
-        window.open(result.whatsappUrl, "_blank");
+      // Verificar resultados e mostrar toast
+      const notifications = [];
+      if (result.emailSent) {
+        notifications.push("E-mail enviado");
+      } else if (sendEmail) {
+        notifications.push("E-mail: serviço não configurado");
       }
+      
+      if (result.whatsappUrl) {
+        notifications.push("WhatsApp pronto");
+        // Abrir WhatsApp em nova aba
+        window.open(result.whatsappUrl, "_blank");
+      } else if (sendWhatsApp && !result.whatsappUrl) {
+        notifications.push("WhatsApp: telefone não disponível");
+      }
+
+      toast({
+        title: "Pagamento final processado!",
+        description: notifications.join(" • "),
+      });
 
       fetchProject();
     } catch (error) {
@@ -679,6 +765,236 @@ export default function ProjetoDetalhesPage() {
                 </div>
                 <User className="h-8 w-8 text-primary/20" />
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cards de Andamento e Dados do Cliente */}
+        <div className="grid gap-6 md:grid-cols-2 mb-8">
+          {/* Card Andamento do Projeto */}
+          <Card className="border-0 shadow-md">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <Activity className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Andamento do Projeto</CardTitle>
+                  <CardDescription>Acompanhe o progresso e status atual</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">Progresso Total</span>
+                  <span className="font-bold text-indigo-600">{project.progress}%</span>
+                </div>
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500"
+                    style={{ width: `${project.progress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Status Atual */}
+              <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+                <div className="flex items-start gap-3">
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    project.status.includes('development') ? 'bg-blue-100' :
+                    project.status === 'waiting_payment' ? 'bg-amber-100' :
+                    project.status === 'waiting_final_payment' ? 'bg-orange-100' :
+                    project.status === 'completed' ? 'bg-green-100' :
+                    'bg-slate-100'
+                  }`}>
+                    {project.status.includes('development') ? <Activity className="h-4 w-4 text-blue-600" /> :
+                     project.status === 'waiting_payment' ? <Clock className="h-4 w-4 text-amber-600" /> :
+                     project.status === 'waiting_final_payment' ? <DollarSign className="h-4 w-4 text-orange-600" /> :
+                     project.status === 'completed' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> :
+                     <Clock className="h-4 w-4 text-slate-600" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">{statusLabels[project.status]}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {project.progress < 100 ? 'Em desenvolvimento' : 
+                       project.status === 'completed' ? 'Projeto concluído com sucesso' :
+                       'Aguardando próxima etapa'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações de Prazo */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                    <p className="text-xs text-slate-500">Início</p>
+                  </div>
+                  <p className="text-sm font-semibold">
+                    {project.startDate ? new Date(project.startDate).toLocaleDateString('pt-BR') : 'Não definido'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                    <p className="text-xs text-slate-500">Prazo</p>
+                  </div>
+                  <p className="text-sm font-semibold capitalize">{project.timeline}</p>
+                </div>
+              </div>
+
+              {/* Ações Rápidas */}
+              <div className="pt-2">
+                {project.progress < 100 && project.status !== 'waiting_payment' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setIsNotificationDialogOpen(true)}
+                  >
+                    <Send className="h-3.5 w-3.5 mr-2" />
+                    Notificar Evolução
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card Dados do Cliente */}
+          <Card className="border-0 shadow-md">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <Building className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Dados do Cliente</CardTitle>
+                  <CardDescription>Informações de contato e identificação</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Nome do Cliente */}
+              <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200">
+                <div className="flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <User className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-700 font-semibold mb-1">Nome do Cliente</p>
+                    <p className="text-sm font-bold text-emerald-900">
+                      {project.client?.name || project.clientName || 'Não informado'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contatos */}
+              <div className="space-y-2">
+                {/* E-mail */}
+                {(project.client?.emails || budget?.clientEmail) && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <Mail className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-500">E-mail</p>
+                      <p className="text-sm font-medium truncate">
+                        {(() => {
+                          if (budget?.clientEmail) return budget.clientEmail;
+                          if (project.client?.emails) {
+                            try {
+                              const emails = JSON.parse(project.client.emails);
+                              return emails[0]?.value || 'Não disponível';
+                            } catch {
+                              return 'Não disponível';
+                            }
+                          }
+                          return 'Não disponível';
+                        })()}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 flex-shrink-0"
+                      onClick={() => {
+                        const email = budget?.clientEmail || (project.client?.emails ? JSON.parse(project.client.emails)[0]?.value : '');
+                        if (email) {
+                          navigator.clipboard.writeText(email);
+                          toast({ title: "Copiado!", description: "E-mail copiado" });
+                        }
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Telefone */}
+                {(project.client?.phones || budget?.clientPhone) && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <Phone className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-500">Telefone</p>
+                      <p className="text-sm font-medium truncate">
+                        {(() => {
+                          if (budget?.clientPhone) return budget.clientPhone;
+                          if (project.client?.phones) {
+                            try {
+                              const phones = JSON.parse(project.client.phones);
+                              return phones[0]?.value || 'Não disponível';
+                            } catch {
+                              return 'Não disponível';
+                            }
+                          }
+                          return 'Não disponível';
+                        })()}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 flex-shrink-0"
+                      onClick={() => {
+                        const phone = budget?.clientPhone || (project.client?.phones ? JSON.parse(project.client.phones)[0]?.value : '');
+                        if (phone) {
+                          navigator.clipboard.writeText(phone);
+                          toast({ title: "Copiado!", description: "Telefone copiado" });
+                        }
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tipo de Projeto e Complexidade */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <p className="text-xs text-slate-500 mb-1">Projeto</p>
+                  <p className="text-sm font-semibold">{typeLabels[project.type] || project.type}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <p className="text-xs text-slate-500 mb-1">Complexidade</p>
+                  <p className="text-sm font-semibold capitalize">{project.complexity}</p>
+                </div>
+              </div>
+
+              {/* Link para Cliente (se existir) */}
+              {project.clientId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => router.push(`/dashboard/clientes/${project.clientId}`)}
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                  Ver Perfil do Cliente
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -976,11 +1292,16 @@ export default function ProjetoDetalhesPage() {
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Data:</span>
                             <span className="font-medium">
-                              {new Date(schedule.date).toLocaleDateString("pt-BR", {
-                                day: '2-digit',
-                                month: 'long',
-                                year: 'numeric'
-                              })}
+                              {(() => {
+                                // Corrigir fuso horário - usar a data diretamente sem conversão UTC
+                                const [year, month, day] = schedule.date.split('-');
+                                const dataFormatada = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                return dataFormatada.toLocaleDateString("pt-BR", {
+                                  day: '2-digit',
+                                  month: 'long',
+                                  year: 'numeric'
+                                });
+                              })()}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -1020,6 +1341,126 @@ export default function ProjetoDetalhesPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Card de Histórico de Tentativas de Agendamento */}
+                      {schedule.history && Array.isArray(schedule.history) && schedule.history.length > 0 && (
+                        <Card className="border-0 shadow-md mt-4 overflow-hidden">
+                          <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white pb-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
+                                  <Clock className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                  <CardTitle className="text-lg">Histórico de Tentativas</CardTitle>
+                                  <CardDescription className="text-amber-100">
+                                    {schedule.history.length} {schedule.history.length === 1 ? 'tentativa registrada' : 'tentativas registradas'}
+                                  </CardDescription>
+                                </div>
+                              </div>
+                              <Badge className="bg-white/20 text-white border-0">
+                                {schedule.history.filter((h: any) => h.status === 'cancelled').length} canceladas
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-0">
+                            <div className="divide-y divide-slate-100">
+                              {schedule.history.map((attempt: any, index: number) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setSelectedHistoryItem(attempt);
+                                    setIsHistoryDetailDialogOpen(true);
+                                  }}
+                                  className={`w-full p-4 hover:bg-slate-50 transition-colors text-left ${
+                                    attempt.status === 'cancelled' 
+                                      ? 'bg-red-50/50 hover:bg-red-50' 
+                                      : attempt.status === 'rescheduled'
+                                        ? 'bg-amber-50/50 hover:bg-amber-50'
+                                        : 'bg-slate-50/50 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-4">
+                                    {/* Ícone/Status */}
+                                    <div className={`h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                      attempt.status === 'cancelled' 
+                                        ? 'bg-red-100 text-red-600' 
+                                        : attempt.status === 'rescheduled'
+                                          ? 'bg-amber-100 text-amber-600'
+                                          : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {attempt.status === 'cancelled' ? <XCircle className="h-6 w-6" /> :
+                                       attempt.status === 'rescheduled' ? <RefreshCw className="h-6 w-6" /> :
+                                       <CheckCircle2 className="h-6 w-6" />}
+                                    </div>
+                                    
+                                    {/* Informações Principais */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <p className={`font-semibold ${
+                                          attempt.status === 'cancelled' ? 'text-red-900' :
+                                          attempt.status === 'rescheduled' ? 'text-amber-900' :
+                                          'text-slate-900'
+                                        }`}>
+                                          {attempt.status === 'cancelled' ? '❌ Cancelado' :
+                                           attempt.status === 'rescheduled' ? '🔄 Reagendado' :
+                                           '✅ Concluído'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {new Date(attempt.createdAt).toLocaleDateString('pt-BR', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </p>
+                                      </div>
+                                      
+                                      <div className="flex items-center gap-4 text-sm">
+                                        <div className="flex items-center gap-1.5">
+                                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                          <span className="font-medium">
+                                            {(() => {
+                                              if (attempt.date) {
+                                                const [year, month, day] = attempt.date.split('-');
+                                                const dataFormatada = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                                return dataFormatada.toLocaleDateString('pt-BR');
+                                              }
+                                              return '—';
+                                            })()}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                          <span className="font-medium">{attempt.time || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          {attempt.type === 'video' ? <Video className="h-3.5 w-3.5 text-muted-foreground" /> :
+                                           attempt.type === 'audio' ? <Phone className="h-3.5 w-3.5 text-muted-foreground" /> :
+                                           <Video className="h-3.5 w-3.5 text-muted-foreground" />}
+                                          <span className="font-medium capitalize">
+                                            {attempt.type === 'video' ? 'Vídeo' : attempt.type === 'audio' ? 'Áudio' : '—'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      
+                                      {attempt.reason && (
+                                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                                          {attempt.status === 'cancelled' ? 'Motivo: ' : 'Obs: '}{formatReason(attempt.reason)}
+                                        </p>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Seta indicadora */}
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
                       {/* Botão Confirmar Entrega - aparece apenas quando status é scheduled ou rescheduled e projeto não está finished */}
                       {project.status !== "finished" && (schedule.status === "scheduled" || schedule.status === "rescheduled") && (
@@ -1367,32 +1808,155 @@ export default function ProjetoDetalhesPage() {
                 Notificar Evolução do Projeto
               </DialogTitle>
               <DialogDescription>
-                Selecione o percentual de evolução para notificar o cliente
+                Selecione a etapa atual do projeto para notificar o cliente
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <p className="text-sm">Informe o progresso atual:</p>
-              <div className="grid grid-cols-2 gap-3">
-                {[20, 50, 70, 100].map((progress) => (
-                  <Button
-                    key={progress}
-                    variant={selectedProgress === progress ? "default" : "outline"}
-                    onClick={() => setSelectedProgress(progress)}
-                    className="h-16 flex flex-col gap-1"
-                  >
-                    <span className="text-2xl font-bold">{progress}%</span>
-                    <span className="text-xs">
-                      {progress === 20 && "Início"}
-                      {progress === 50 && "Metade"}
-                      {progress === 70 && "Quase lá"}
-                      {progress === 100 && "Concluído"}
-                    </span>
-                  </Button>
-                ))}
+              <p className="text-sm font-semibold">Etapa do Projeto:</p>
+              
+              {/* Etapas do Projeto */}
+              <div className="space-y-2">
+                {/* Etapa 1: Projeto Iniciado */}
+                <Button
+                  variant={selectedStage === "started" ? "default" : "outline"}
+                  onClick={() => setSelectedStage("started")}
+                  className="w-full justify-start h-auto py-3 px-4"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      selectedStage === "started" ? "bg-white/20" : "bg-blue-50"
+                    }`}>
+                      <Rocket className={`h-5 w-5 ${
+                        selectedStage === "started" ? "text-white" : "text-blue-600"
+                      }`} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold">🚀 Projeto Iniciado</p>
+                      <p className="text-xs text-muted-foreground">
+                        Primeiros desenvolvimentos • 20% concluído
+                      </p>
+                    </div>
+                    {selectedStage === "started" && (
+                      <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                    )}
+                  </div>
+                </Button>
+
+                {/* Etapa 2: Em Desenvolvimento */}
+                <Button
+                  variant={selectedStage === "in_progress" ? "default" : "outline"}
+                  onClick={() => setSelectedStage("in_progress")}
+                  className="w-full justify-start h-auto py-3 px-4"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      selectedStage === "in_progress" ? "bg-white/20" : "bg-indigo-50"
+                    }`}>
+                      <Activity className={`h-5 w-5 ${
+                        selectedStage === "in_progress" ? "text-white" : "text-indigo-600"
+                      }`} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold">⚙️ Em Desenvolvimento</p>
+                      <p className="text-xs text-muted-foreground">
+                        Metade do caminho • 50% concluído
+                      </p>
+                    </div>
+                    {selectedStage === "in_progress" && (
+                      <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                    )}
+                  </div>
+                </Button>
+
+                {/* Etapa 3: Quase Concluído */}
+                <Button
+                  variant={selectedStage === "almost_done" ? "default" : "outline"}
+                  onClick={() => setSelectedStage("almost_done")}
+                  className="w-full justify-start h-auto py-3 px-4"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      selectedStage === "almost_done" ? "bg-white/20" : "bg-amber-50"
+                    }`}>
+                      <Clock className={`h-5 w-5 ${
+                        selectedStage === "almost_done" ? "text-white" : "text-amber-600"
+                      }`} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold">🎯 Quase Concluído</p>
+                      <p className="text-xs text-muted-foreground">
+                        Reta final • 70% concluído
+                      </p>
+                    </div>
+                    {selectedStage === "almost_done" && (
+                      <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                    )}
+                  </div>
+                </Button>
+
+                {/* Etapa 4: Projeto Concluído */}
+                <Button
+                  variant={selectedStage === "completed" ? "default" : "outline"}
+                  onClick={() => setSelectedStage("completed")}
+                  className="w-full justify-start h-auto py-3 px-4"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      selectedStage === "completed" ? "bg-white/20" : "bg-green-50"
+                    }`}>
+                      <CheckCircle2 className={`h-5 w-5 ${
+                        selectedStage === "completed" ? "text-white" : "text-green-600"
+                      }`} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold">✅ Projeto Concluído</p>
+                      <p className="text-xs text-muted-foreground">
+                        Pronto para entrega • 100% concluído
+                      </p>
+                    </div>
+                    {selectedStage === "completed" && (
+                      <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                    )}
+                  </div>
+                </Button>
               </div>
+
+              {/* Opções de Envio */}
+              <div className="space-y-3 pt-2">
+                <Label className="text-sm font-semibold">Enviar notificação por:</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="notifyEmail"
+                      checked={notifyEmail}
+                      onChange={(e) => setNotifyEmail(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="notifyEmail" className="flex items-center gap-2 cursor-pointer font-normal">
+                      <Mail className="h-4 w-4" /> E-mail
+                    </Label>
+                  </div>
+                  {project?.clientPhone && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="notifyWhatsApp"
+                        checked={notifyWhatsApp}
+                        onChange={(e) => setNotifyWhatsApp(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="notifyWhatsApp" className="flex items-center gap-2 cursor-pointer font-normal">
+                        <Phone className="h-4 w-4" /> WhatsApp
+                      </Label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                  📧 O cliente receberá um e-mail automático informando sobre a evolução do projeto.
+                  📧 O cliente receberá uma notificação sobre a evolução do projeto pelos canais selecionados.
                 </p>
               </div>
             </div>
@@ -1401,8 +1965,8 @@ export default function ProjetoDetalhesPage() {
                 Cancelar
               </Button>
               <Button
-                onClick={() => selectedProgress && handleNotifyProgress(selectedProgress)}
-                disabled={!selectedProgress || isNotifyingProgress}
+                onClick={() => selectedStage && handleNotifyProgress(selectedStage)}
+                disabled={!selectedStage || isNotifyingProgress || (!notifyEmail && !notifyWhatsApp)}
               >
                 {isNotifyingProgress ? "Enviando..." : "Notificar Cliente"}
               </Button>
@@ -1452,6 +2016,70 @@ export default function ProjetoDetalhesPage() {
                       Abrir Link
                     </Button>
                   </div>
+                  
+                  {/* Botões de Envio Direto */}
+                  <div className="space-y-2 pt-2">
+                    <p className="text-sm font-semibold">Enviar por:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => {
+                          const email = budget?.clientEmail || project.clientEmail;
+                          if (!email) {
+                            toast({
+                              title: "E-mail não disponível",
+                              description: "O e-mail do cliente não está disponível.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const subject = `Pagamento Final - ${project.name}`;
+                          const body = `Olá ${budget?.clientName || project.clientName}!\n\nSeu projeto está 100% concluído! 🎉\n\nSegue o link para pagamento final (75%):\n\n${finalPaymentLink}\n\nValor: R$ ${((project.budget || 0) * 0.75).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\nApós o pagamento, você poderá agendar a entrega!\n\nEquipe Softrha`;
+
+                          window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
+
+                          toast({
+                            title: "E-mail aberto!",
+                            description: "Preencha e envie o e-mail para o cliente.",
+                          });
+                        }}
+                        className="flex-1"
+                        variant="outline"
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        E-mail
+                      </Button>
+
+                      <Button
+                        onClick={() => {
+                          const phone = budget?.clientPhone || project.clientPhone;
+                          if (!phone) {
+                            toast({
+                              title: "Telefone não disponível",
+                              description: "O telefone do cliente não está disponível.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const phoneDigits = phone.replace(/\D/g, "");
+                          const message = `Olá ${budget?.clientName || project.clientName}! 🎉\n\nSeu projeto está 100% concluído!\n\nSegue o link para pagamento final (75%):\n\n${finalPaymentLink}\n\nValor: R$ ${((project.budget || 0) * 0.75).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\nApós o pagamento, você poderá agendar a entrega!\n\nEquipe Softrha`;
+
+                          window.open(`https://wa.me/55${phoneDigits}?text=${encodeURIComponent(message)}`, "_blank");
+
+                          toast({
+                            title: "WhatsApp aberto!",
+                            description: "Envie a mensagem para o cliente.",
+                          });
+                        }}
+                        className="flex-1"
+                        variant="outline"
+                        disabled={!budget?.clientPhone && !project.clientPhone}
+                      >
+                        <Phone className="h-4 w-4 mr-2" />
+                        WhatsApp
+                      </Button>
+                    </div>
+                  </div>
+                  
                   <p className="text-xs text-muted-foreground text-center">
                     O projeto será concluído automaticamente após a confirmação do pagamento.
                   </p>
@@ -1584,11 +2212,11 @@ export default function ProjetoDetalhesPage() {
                         <SelectValue placeholder="Selecione o motivo" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cliente_nao_respondeu">Cliente não respondeu</SelectItem>
-                        <SelectItem value="cliente_desistiu">Cliente desistiu</SelectItem>
-                        <SelectItem value="erro_tecnico">Erro técnico na entrega</SelectItem>
-                        <SelectItem value="agenda_incompativel">Agenda incompatível</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
+                        <SelectItem value="cliente_nao_respondeu">📵 Não obtivemos resposta do cliente</SelectItem>
+                        <SelectItem value="cliente_desistiu">❌ O cliente desistiu do projeto</SelectItem>
+                        <SelectItem value="erro_tecnico">⚠️ Erro técnico na entrega</SelectItem>
+                        <SelectItem value="agenda_incompativel">📅 Agenda incompatível com o cliente</SelectItem>
+                        <SelectItem value="outro">📝 Outro motivo</SelectItem>
                       </SelectContent>
                     </Select>
                     {!failureReason && (
@@ -1659,6 +2287,186 @@ export default function ProjetoDetalhesPage() {
                     )}
                   </>
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Detalhes do Histórico de Agendamento */}
+        <Dialog open={isHistoryDetailDialogOpen} onOpenChange={setIsHistoryDetailDialogOpen}>
+          <DialogContent className="sm:max-w-[550px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-600" />
+                Detalhes da Tentativa
+              </DialogTitle>
+              <DialogDescription>
+                Informações completas sobre esta tentativa de agendamento
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedHistoryItem && (
+              <div className="space-y-6">
+                {/* Status Header */}
+                <div className={`p-4 rounded-lg border-2 ${
+                  selectedHistoryItem.status === 'cancelled' 
+                    ? 'bg-red-50 border-red-200' 
+                    : selectedHistoryItem.status === 'rescheduled'
+                      ? 'bg-amber-50 border-amber-200'
+                      : 'bg-green-50 border-green-200'
+                }`}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                      selectedHistoryItem.status === 'cancelled' 
+                        ? 'bg-red-100 text-red-600' 
+                        : selectedHistoryItem.status === 'rescheduled'
+                          ? 'bg-amber-100 text-amber-600'
+                          : 'bg-green-100 text-green-600'
+                    }`}>
+                      {selectedHistoryItem.status === 'cancelled' ? <XCircle className="h-5 w-5" /> :
+                       selectedHistoryItem.status === 'rescheduled' ? <RefreshCw className="h-5 w-5" /> :
+                       <CheckCircle2 className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <p className={`font-bold text-lg ${
+                        selectedHistoryItem.status === 'cancelled' ? 'text-red-900' :
+                        selectedHistoryItem.status === 'rescheduled' ? 'text-amber-900' :
+                        'text-green-900'
+                      }`}>
+                        {selectedHistoryItem.status === 'cancelled' ? '❌ Cancelado' :
+                         selectedHistoryItem.status === 'rescheduled' ? '🔄 Reagendado' :
+                         '✅ Concluído'}
+                      </p>
+                      <p className={`text-xs ${
+                        selectedHistoryItem.status === 'cancelled' ? 'text-red-700' :
+                        selectedHistoryItem.status === 'rescheduled' ? 'text-amber-700' :
+                        'text-green-700'
+                      }`}>
+                        {new Date(selectedHistoryItem.createdAt).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalhes do Agendamento */}
+                <div>
+                  <h4 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wider">
+                    📅 Detalhes do Agendamento
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                        <span className="text-xs text-slate-500">Data</span>
+                      </div>
+                      <p className="font-semibold">
+                        {(() => {
+                          if (selectedHistoryItem.date) {
+                            const [year, month, day] = selectedHistoryItem.date.split('-');
+                            const dataFormatada = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            return dataFormatada.toLocaleDateString('pt-BR', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric'
+                            });
+                          }
+                          return '—';
+                        })()}
+                      </p>
+                    </div>
+                    
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="text-xs text-slate-500">Horário</span>
+                      </div>
+                      <p className="font-semibold">{selectedHistoryItem.time || '—'}</p>
+                    </div>
+                    
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-2 mb-1">
+                        {selectedHistoryItem.type === 'video' ? <Video className="h-4 w-4 text-slate-400" /> :
+                         <Phone className="h-4 w-4 text-slate-400" />}
+                        <span className="text-xs text-slate-500">Tipo</span>
+                      </div>
+                      <p className="font-semibold capitalize">
+                        {selectedHistoryItem.type === 'video' ? '📹 Vídeo Chamada' :
+                         selectedHistoryItem.type === 'audio' ? '📞 Áudio Chamada' :
+                         '—'}
+                      </p>
+                    </div>
+                    
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="h-4 w-4 text-slate-400" />
+                        <span className="text-xs text-slate-500">Status</span>
+                      </div>
+                      <Badge variant="outline" className={`text-xs ${
+                        selectedHistoryItem.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-300' :
+                        selectedHistoryItem.status === 'rescheduled' ? 'bg-amber-100 text-amber-700 border-amber-300' :
+                        'bg-green-100 text-green-700 border-green-300'
+                      }`}>
+                        {selectedHistoryItem.status === 'cancelled' ? 'Cancelado' :
+                         selectedHistoryItem.status === 'rescheduled' ? 'Reagendado' :
+                         selectedHistoryItem.status === 'completed' ? 'Concluído' :
+                         'Agendado'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Motivo/Observações */}
+                {(selectedHistoryItem.reason || selectedHistoryItem.description) && (
+                  <div>
+                    <h4 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wider">
+                      📝 {selectedHistoryItem.status === 'cancelled' ? 'Motivo do Cancelamento' : 'Observações'}
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedHistoryItem.reason && (
+                        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                          <p className="text-xs font-semibold text-amber-800 mb-1">
+                            {selectedHistoryItem.status === 'cancelled' ? 'Motivo:' : 'Observação:'}
+                          </p>
+                          <p className="text-sm text-amber-900">{formatReason(selectedHistoryItem.reason)}</p>
+                        </div>
+                      )}
+                      {selectedHistoryItem.description && (
+                        <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+                          <p className="text-xs font-semibold text-slate-700 mb-1">
+                            Descrição adicional:
+                          </p>
+                          <p className="text-sm text-slate-900 whitespace-pre-wrap">{selectedHistoryItem.description}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Informações de Registro */}
+                <div className="pt-4 border-t border-slate-200">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Registrado em {new Date(selectedHistoryItem.createdAt).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsHistoryDetailDialogOpen(false)}>
+                Fechar
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -79,7 +79,11 @@ export async function POST(
       schedule = await prisma.schedule.update({
         where: { id: project.schedule.id },
         data: {
-          date: new Date(date),
+          // Corrigir fuso horário - criar data no timezone local
+          date: (() => {
+            const [year, month, day] = date.split('-');
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          })(),
           time,
           type,
           status: "scheduled",
@@ -91,7 +95,11 @@ export async function POST(
       schedule = await prisma.schedule.create({
         data: {
           projectId,
-          date: new Date(date),
+          // Corrigir fuso horário - criar data no timezone local
+          date: (() => {
+            const [year, month, day] = date.split('-');
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          })(),
           time,
           type,
           status: "scheduled",
@@ -105,6 +113,11 @@ export async function POST(
     if (budget?.clientEmail && resend) {
       try {
         const typeLabel = type === "video" ? "Vídeo Chamada" : "Áudio Chamada";
+        
+        // Formatar data corretamente sem fuso horário
+        const [year, month, day] = date.split('-');
+        const dataFormatada = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const dataFormatadaString = dataFormatada.toLocaleDateString("pt-BR");
 
         await resend.emails.send({
           from: process.env.EMAIL_FROM || "Softrha <noreply@softrha.com>",
@@ -115,10 +128,10 @@ export async function POST(
               <h2 style="color: #2563eb;">Entrega do Projeto Agendada! 🎉</h2>
               <p>Olá <strong>${budget.clientName}</strong>,</p>
               <p>Seu agendamento para entrega do projeto <strong>${project.name}</strong> foi confirmado!</p>
-              
+
               <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <h3 style="margin-top: 0; color: #1f2937;">Detalhes do Agendamento</h3>
-                <p><strong>📅 Data:</strong> ${new Date(date).toLocaleDateString("pt-BR")}</p>
+                <p><strong>📅 Data:</strong> ${dataFormatadaString}</p>
                 <p><strong>🕐 Horário:</strong> ${time}</p>
                 <p><strong>📞 Tipo:</strong> ${typeLabel}</p>
                 ${meetingLink ? `<p><strong>🔗 Link da Reunião:</strong> <a href="${meetingLink}" style="color: #2563eb;">${meetingLink}</a></p>` : ""}
@@ -259,7 +272,13 @@ export async function PUT(
     const schedule = await prisma.schedule.update({
       where: { id: existingSchedule.id },
       data: {
-        ...(date && { date: new Date(date) }),
+        ...(date && { 
+          // Corrigir fuso horário - criar data no timezone local
+          date: (() => {
+            const [year, month, day] = date.split('-');
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          })()
+        }),
         ...(time && { time }),
         ...(type && { type }),
         ...(notes && { notes }),

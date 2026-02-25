@@ -67,6 +67,21 @@ export async function POST(
       );
     }
 
+    // Preparar entrada do histórico
+    const historyEntry = {
+      date: schedule.date.toISOString().split('T')[0],
+      time: schedule.time,
+      type: schedule.type,
+      status: success ? 'completed' : 'cancelled',
+      reason: failureReason || null,
+      description: failureDescription || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Obter histórico existente ou criar novo
+    const existingHistory = Array.isArray(schedule.history) ? schedule.history : [];
+    const updatedHistory = [...existingHistory, historyEntry];
+
     // Atualizar agendamento
     const updatedSchedule = await prisma.schedule.update({
       where: { id: schedule.id },
@@ -74,10 +89,13 @@ export async function POST(
         // Se sucesso: completed
         // Se falha: pending_reschedule (aguardando cliente reagendar)
         status: success ? "completed" : "pending_reschedule",
-        ...(failureReason && { 
-          notes: failureDescription 
-            ? `${schedule.notes || ''}\n\n[Falha na entrega - ${new Date().toLocaleDateString('pt-BR')}]\nMotivo: ${failureReason}\nDescrição: ${failureDescription}`
-            : `${schedule.notes || ''}\n\n[Falha na entrega - ${new Date().toLocaleDateString('pt-BR')}]\nMotivo: ${failureReason}`
+        // Salvar histórico
+        history: updatedHistory,
+        // Salvar motivo do cancelamento
+        ...(failureReason && { cancellationReason: failureReason }),
+        // Atualizar notas
+        ...(failureDescription && {
+          notes: `${schedule.notes || ''}\n\n[Falha na entrega - ${new Date().toLocaleDateString('pt-BR')}]\nMotivo: ${failureReason}\nDescrição: ${failureDescription}`
         }),
       },
     });

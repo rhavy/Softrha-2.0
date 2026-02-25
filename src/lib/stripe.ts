@@ -10,12 +10,16 @@ export const stripe = new Stripe(stripeSecretKey, {
 });
 
 /**
- * Gera um link de pagamento no Stripe
+ * Gera um link de pagamento no Stripe com suporte a PIX e Cartão Parcelado
  * @param amount Valor em Reais (ex: 2500.00)
  * @param description Descrição do produto
  * @param metadata Metadados para passar para o webhook (budgetId, type, etc)
  */
-export const generatePaymentLink = async (amount: number, description: string, metadata: Record<string, string>) => {
+export const generatePaymentLink = async (
+  amount: number,
+  description: string,
+  metadata: Record<string, string>
+) => {
   console.log("[Stripe] Gerando link de pagamento:", { amount, description, metadata });
 
   try {
@@ -38,13 +42,15 @@ export const generatePaymentLink = async (amount: number, description: string, m
           quantity: 1,
         },
       ],
+      // Cartão de crédito com parcelamento (1-12x)
+      // PIX está disponível mas requer ativação no dashboard do Stripe
       payment_method_types: ['card'],
       // Metadados do Payment Link
       metadata: {
         ...metadata,
         description,
       },
-      // Passar metadados para o Payment Intent (que será passado para a sessão)
+      // Passar metadados para o Payment Intent
       payment_intent_data: {
         metadata: {
           ...metadata,
