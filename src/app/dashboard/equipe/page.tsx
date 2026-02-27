@@ -79,24 +79,47 @@ export default function DashboardEquipe() {
 
   const handleNewMember = async (data: any) => {
     try {
-      const response = await fetch("/api/equipe", {
-        method: "POST",
+      // Buscar dados do usuário selecionado
+      const userResponse = await fetch(`/api/equipe/usuarios-disponiveis`);
+      let users = [];
+      if (userResponse.ok) {
+        users = await userResponse.json();
+      }
+      
+      const selectedUser = users.find((u: any) => u.id === data.userId);
+      
+      if (!selectedUser) {
+        throw new Error("Usuário selecionado não encontrado");
+      }
+
+      // Atualizar usuário para TEAM_MEMBER com os dados fornecidos
+      const response = await fetch(`/api/equipe/${data.userId}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          role: data.role, // Cargo
+          area: data.area,
+          skills: data.technologies,
+          status: data.status,
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao criar membro");
+        throw new Error(errorData.error || "Erro ao adicionar membro");
       }
 
       await fetchMembers();
       setModalOpen(false);
+      toast({
+        title: "Membro adicionado!",
+        description: `${selectedUser.name} foi adicionado à equipe como ${data.role}.`,
+      });
     } catch (error) {
-      console.error("Erro ao criar membro:", error);
+      console.error("Erro ao adicionar membro:", error);
       toast({
         title: "Erro",
-        description: "Erro ao criar membro: " + (error as any).message,
+        description: "Erro ao adicionar membro: " + (error as any).message,
         variant: "destructive",
       });
     }
@@ -156,11 +179,15 @@ export default function DashboardEquipe() {
       await fetchMembers();
       setDeleteDialogOpen(false);
       setMemberToDelete(null);
+      toast({
+        title: "Membro removido!",
+        description: "O membro foi removido da equipe.",
+      });
     } catch (error) {
-      console.error("Erro ao excluir membro:", error);
+      console.error("Erro ao remover membro:", error);
       toast({
         title: "Erro",
-        description: "Erro ao excluir membro: " + (error as any).message,
+        description: "Erro ao remover membro: " + (error as any).message,
         variant: "destructive",
       });
     }

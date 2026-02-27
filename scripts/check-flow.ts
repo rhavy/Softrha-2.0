@@ -227,7 +227,7 @@ async function fixIssues(budget: any, issues: string[]) {
         console.log('✅ Cliente criado: ' + clientId);
       }
 
-      const adminUser = await prisma.user.findFirst({ where: { role: 'admin' } });
+      const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
 
       const project = await prisma.project.create({
         data: {

@@ -215,17 +215,18 @@ export default function OrcamentoDetalhesPage() {
       fetchBudget();
       fetchActionHistory();
 
-      // Polling só é necessário quando status indica aguardando pagamento
-      // Intervalo aumentado para 10s para reduzir requisições desnecessárias
+      // Atualizar status a cada 5000ms (5 segundos)
       const intervalId = setInterval(() => {
-        if (budget && (budget.status === "down_payment_sent" || budget.status === "contract_signed")) {
-          fetchBudget(false); // Não mostrar loading durante polling
-        }
-      }, 5000); // Atualiza a cada 10 segundos
+        fetchBudget(false); // Não mostrar loading durante polling
+      }, 5000);
 
-      return () => clearInterval(intervalId);
+      return () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
     }
-  }, [params.id, budget?.status]);
+  }, [params.id]);
 
   const fetchBudget = async (showLoading = true) => {
     try {

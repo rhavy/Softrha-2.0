@@ -43,10 +43,10 @@ export default function Dashboard() {
   });
 
   const stats = [
-    { label: "Projetos Ativos", value: statsData.projects.toString(), icon: FolderKanban, change: "+2", trend: "up" },
-    { label: "Tarefas Pendentes", value: statsData.tasks.toString(), icon: Clock, change: "-5", trend: "down" },
-    { label: "Tarefas Concluídas", value: statsData.completed.toString(), icon: CheckCircle2, change: "+18", trend: "up" },
-    { label: "Mensagens", value: statsData.messages.toString(), icon: MessageSquare, change: "+4", trend: "up" },
+    { label: "Projetos Ativos", value: statsData.projects?.toString() || "0", icon: FolderKanban, change: "+2", trend: "up" },
+    { label: "Tarefas Pendentes", value: statsData.tasks?.toString() || "0", icon: Clock, change: "-5", trend: "down" },
+    { label: "Tarefas Concluídas", value: statsData.completed?.toString() || "0", icon: CheckCircle2, change: "+18", trend: "up" },
+    { label: "Mensagens", value: statsData.messages?.toString() || "0", icon: MessageSquare, change: "+4", trend: "up" },
   ];
 
   const projects = [

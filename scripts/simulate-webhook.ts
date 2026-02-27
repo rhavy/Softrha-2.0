@@ -122,7 +122,7 @@ async function simulateWebhook(budgetId: string) {
     log('\n👨‍💼 [3/7] Buscando usuário admin...', colors.blue);
 
     const adminUser = await prisma.user.findFirst({
-      where: { role: 'admin' },
+      where: { role: 'ADMIN' },
     });
 
     if (adminUser) {

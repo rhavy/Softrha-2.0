@@ -44,6 +44,10 @@ export default function Login() {
       if (result.error) {
         setError(result.error.message || "Erro ao fazer login");
       } else {
+        console.log("[LOGIN] Login bem-sucedido!");
+        
+        // Redirecionar para dashboard
+        // A verificação de emailVerified será feita pelo hook e pelo proxy
         router.push("/dashboard");
         router.refresh();
       }

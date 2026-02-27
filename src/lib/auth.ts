@@ -37,11 +37,19 @@ export const auth = betterAuth({
     },
   },
   user: {
-    additionalFields: {
+    modelName: "User",
+    fields: {
+      id: "id",
+      email: "email",
+      emailVerified: "emailVerified",
+      name: "name",
+      image: "image",
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
       role: {
         type: "string",
         required: false,
-        defaultValue: "user",
+        defaultValue: "USER", // Valor do enum UserRole
         input: false,
       },
     },

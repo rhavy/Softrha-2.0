@@ -175,6 +175,17 @@ export default function OrcamentosPage() {
 
   useEffect(() => {
     fetchBudgets();
+    
+    // Atualizar status a cada 5000ms (5 segundos)
+    const intervalId = setInterval(() => {
+      fetchBudgets();
+    }, 5000);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
 
   const fetchBudgets = async () => {

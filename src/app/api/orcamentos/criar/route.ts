@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     if (!systemUser) {
       systemUser = await prisma.user.findFirst({
-        where: { role: "admin" },
+        where: { role: "ADMIN" },
       });
     }
 

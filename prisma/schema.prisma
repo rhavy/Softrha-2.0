@@ -21,9 +21,21 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   password      String?
-  role          String    @default("user") // user, admin
+  role          UserRole  @default(USER) // USER, ADMIN, TEAM_MEMBER, CLIENT
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  // Campos adicionais para membros da equipe
+  teamRole      String?   // Cargo na equipe (ex: Developer, Designer, PM)
+  phone         String?   // Telefone
+  avatar        String?   // URL do avatar
+  status        String    @default("active") // active, busy, away, inactive
+  skills        Json?     // JSON array de habilidades
+  projectsCount Int       @default(0)
+
+  // Campos de registro
+  birthDate     DateTime? // Data de nascimento
+  sex           String?   // Sexo: male, female, other, prefer-not-say
 
   // Relações
   accounts                Account[]
@@ -36,8 +48,16 @@ model User {
   comments                Comment[]
   notifications           Notification[]
   notificationPreferences UserNotificationPreference[]
+  logs                    Log[] // Logs de ações do usuário
 
   @@map("users")
+}
+
+// Enum para tipos de usuário
+enum UserRole {
+  USER
+  ADMIN
+  TEAM_MEMBER
 }
 
 model Account {
@@ -111,6 +131,9 @@ model Project {
   completedAt DateTime?
   gitRepositoryUrl String? // URL do repositório Git
   testUrl String? // URL de teste do projeto (staging, preview)
+  lastUrlChangeReason UrlChangeReason? // Motivo da última alteração de URL
+  lastUrlChangeDescription String? @db.Text // Descrição/obs da última alteração de URL
+  lastUrlChangedAt DateTime? // Data da última alteração de URL
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -123,8 +146,27 @@ model Project {
   payments   Payment[]
   contract   Contract?
   schedule   Schedule?
+  urlHistory ProjectUrlHistory[]
 
   @@map("projects")
+}
+
+// Histórico de alterações de URL do Projeto
+model ProjectUrlHistory {
+  id          String   @id @default(cuid())
+  projectId   String
+  field       String   // git ou test
+  oldUrl      String?
+  newUrl      String
+  reason      UrlChangeReason
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  // Relações
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_url_history")
 }
 
 model Task {
@@ -218,6 +260,53 @@ enum Select {
   cliente_sem_resposta
   erro_interno
   outro
+}
+
+// Enum para motivos de alteração de URL
+enum UrlChangeReason {
+  migracao_repositorio
+  mudanca_plataforma
+  atualizacao_ambiente
+  erro_url_anterior
+  solicitacao_cliente
+  outro
+}
+
+// Enum para tipo de log
+enum LogType {
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  LOGIN
+  LOGOUT
+  PAYMENT
+  CONTRACT
+  SCHEDULE
+  NOTIFICATION
+  SYSTEM
+}
+
+// Enum para categoria de log
+enum LogCategory {
+  PROJECT
+  BUDGET
+  CLIENT
+  TASK
+  CONTRACT
+  PAYMENT
+  SCHEDULE
+  USER
+  SYSTEM
+  NOTIFICATION
+}
+
+// Enum para nível de severidade do log
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
 }
 
 model Payment {
@@ -336,26 +425,6 @@ model Activity {
   project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@map("activities")
-}
-
-// ============================================
-// MODELOS DE EQUIPE (Dashboard)
-// ============================================
-
-model TeamMember {
-  id        String   @id @default(cuid())
-  name      String
-  role      String
-  email     String
-  phone     String?
-  avatar    String?
-  status    String   @default("active") // active, busy, away
-  skills    String? // JSON array
-  projects  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("team_members")
 }
 
 // ============================================
@@ -480,4 +549,35 @@ model UserNotificationPreference {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_notification_preferences")
+}
+
+// ============================================
+// MODELO DE LOGS (Sistema de Rastreamento)
+// ============================================
+
+model Log {
+  id          String   @id @default(cuid())
+  type        LogType
+  category    LogCategory
+  level       LogLevel @default(INFO)
+  userId      String?  // Usuário que realizou a ação (pode ser null para ações do sistema)
+  entityId    String?  // ID do registro afetado (projeto, orçamento, etc.)
+  entityType  String?  // Tipo de entidade (Project, Budget, Client, etc.)
+  action      String   // Descrição da ação realizada
+  description String?  @db.Text // Descrição detalhada
+  metadata    Json?    // Dados adicionais da operação
+  changes     Json?    // Registro das mudanças (antes/depois)
+  ipAddress   String?  // IP da requisição
+  userAgent   String?  // User agent do navegador
+  createdAt   DateTime @default(now())
+
+  // Relações
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entityId])
+  @@index([type])
+  @@index([category])
+  @@index([createdAt])
+  @@map("logs")
 }

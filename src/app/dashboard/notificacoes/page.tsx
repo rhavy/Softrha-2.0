@@ -4,87 +4,99 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import {
   Bell,
-  Search,
-  Check,
-  Trash2,
-  ExternalLink,
-  Filter,
-  CheckCheck,
-  Archive,
-  Calendar,
+  Mail,
+  CheckCircle2,
   Clock,
-  ArrowLeft,
-  ArrowRight,
+  AlertTriangle,
+  Info,
+  Trash2,
+  CheckCheck,
+  RefreshCcw,
+  Calendar,
+  DollarSign,
+  FileText,
+  User,
+  Projector,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useNotifications } from "@/hooks/use-notifications";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 interface Notification {
   id: string;
   userId: string;
   title: string;
   message: string;
-  type: "info" | "success" | "warning" | "error";
-  category: "general" | "project" | "client" | "budget" | "task";
+  type: string;
+  category: string;
   read: boolean;
   link: string | null;
   metadata: any;
   createdAt: string;
 }
 
-const categoryLabels: Record<string, string> = {
-  general: "Geral",
-  project: "Projeto",
-  client: "Cliente",
-  budget: "Orçamento",
-  task: "Tarefa",
+const typeConfig: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
+  info: {
+    color: "text-blue-600 bg-blue-100 border-blue-500",
+    icon: <Info className="h-4 w-4" />,
+    label: "Informação",
+  },
+  success: {
+    color: "text-green-600 bg-green-100 border-green-500",
+    icon: <CheckCircle2 className="h-4 w-4" />,
+    label: "Sucesso",
+  },
+  warning: {
+    color: "text-amber-600 bg-amber-100 border-amber-500",
+    icon: <AlertTriangle className="h-4 w-4" />,
+    label: "Atenção",
+  },
+  error: {
+    color: "text-red-600 bg-red-100 border-red-500",
+    icon: <AlertTriangle className="h-4 w-4" />,
+    label: "Erro",
+  },
 };
 
-const categoryIcons: Record<string, any> = {
-  general: Bell,
-  project: Clock,
-  client: ExternalLink,
-  budget: Calendar,
-  task: Check,
-};
-
-const typeColors: Record<string, string> = {
-  info: "bg-blue-500",
-  success: "bg-green-500",
-  warning: "bg-yellow-500",
-  error: "bg-red-500",
+const categoryConfig: Record<string, { color: string; icon: React.ReactNode }> = {
+  general: { color: "text-gray-600", icon: <Bell className="h-3.5 w-3.5" /> },
+  project: { color: "text-blue-600", icon: <Projector className="h-3.5 w-3.5" /> },
+  client: { color: "text-purple-600", icon: <User className="h-3.5 w-3.5" /> },
+  budget: { color: "text-green-600", icon: <DollarSign className="h-3.5 w-3.5" /> },
+  task: { color: "text-amber-600", icon: <Clock className="h-3.5 w-3.5" /> },
+  payment: { color: "text-emerald-600", icon: <DollarSign className="h-3.5 w-3.5" /> },
+  contract: { color: "text-indigo-600", icon: <FileText className="h-3.5 w-3.5" /> },
 };
 
 export default function NotificacoesPage() {
   const { toast } = useToast();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, refresh } = useNotifications();
-  const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("todas");
-  const [statusFilter, setStatusFilter] = useState<string>("todas");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
 
   useEffect(() => {
-    fetchAllNotifications();
+    fetchNotifications();
+    
+    // Atualizar notificações a cada 10 segundos
+    const intervalId = setInterval(() => {
+      fetchNotifications();
+    }, 10000);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
 
-  const fetchAllNotifications = async () => {
+  const fetchNotifications = async () => {
     try {
-      const response = await fetch("/api/notificacoes?limit=100", {
-        credentials: "include",
-      });
+      const response = await fetch("/api/notificacoes");
       if (!response.ok) throw new Error("Erro ao buscar notificações");
       const data = await response.json();
-      setAllNotifications(data.notifications || []);
+      setNotifications(data);
     } catch (error) {
       toast({
         title: "Erro",
@@ -96,295 +108,331 @@ export default function NotificacoesPage() {
     }
   };
 
-  const handleDelete = async (notificationId: string) => {
-    await deleteNotification(notificationId);
-    setAllNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-  };
-
   const handleMarkAsRead = async (notificationId: string) => {
-    await markAsRead(notificationId);
-    setAllNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-    );
+    try {
+      const response = await fetch(`/api/notificacoes/${notificationId}/read`, {
+        method: "PATCH",
+      });
+
+      if (!response.ok) throw new Error("Erro ao marcar como lida");
+
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId ? { ...n, read: true } : n
+        )
+      );
+
+      toast({
+        title: "Notificação lida!",
+        description: "A notificação foi marcada como lida.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível marcar a notificação como lida",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleMarkAllAsRead = async () => {
-    await markAllAsRead();
-    setAllNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    refresh();
+    try {
+      const response = await fetch("/api/notificacoes/read-all", {
+        method: "PATCH",
+      });
+
+      if (!response.ok) throw new Error("Erro ao marcar todas como lidas");
+
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+      toast({
+        title: "Todas lidas!",
+        description: "Todas as notificações foram marcadas como lidas.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível marcar todas as notificações",
+        variant: "destructive",
+      });
+    }
   };
 
-  const filteredNotifications = allNotifications.filter((notification) => {
-    const matchesSearch =
-      notification.title.toLowerCase().includes(search.toLowerCase()) ||
-      notification.message.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === "todas" || notification.category === categoryFilter;
-    const matchesStatus = statusFilter === "todas" || (statusFilter === "read" && notification.read) || (statusFilter === "unread" && !notification.read);
-    return matchesSearch && matchesCategory && matchesStatus;
+  const handleDeleteNotification = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notificacoes/${notificationId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) throw new Error("Erro ao excluir notificação");
+
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+
+      toast({
+        title: "Excluída!",
+        description: "A notificação foi excluída.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a notificação",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.read) {
+      handleMarkAsRead(notification.id);
+    }
+
+    if (notification.link) {
+      window.location.href = notification.link;
+    }
+  };
+
+  const filteredNotifications = notifications.filter((n) => {
+    if (filter === "unread") return !n.read;
+    if (filter === "read") return n.read;
+    return true;
   });
 
-  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
-  const paginatedNotifications = filteredNotifications.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const stats = {
-    total: allNotifications.length,
-    unread: allNotifications.filter((n) => !n.read).length,
-    read: allNotifications.filter((n) => n.read).length,
-  };
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <DashboardLayout>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 mb-8">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Notificações</h1>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Bell className="h-8 w-8" />
+              Notificações
+            </h1>
             <p className="text-muted-foreground">
-              Gerencie todas as suas notificações
+              Acompanhe todas as notificações do sistema
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={fetchNotifications}
+              disabled={isLoading}
+            >
+              <RefreshCcw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+            {unreadCount > 0 && (
+              <Button variant="outline" onClick={handleMarkAllAsRead}>
+                <CheckCheck className="h-4 w-4 mr-2" />
+                Marcar todas como lidas
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-3 mb-8">
+        <div className="grid gap-4 sm:grid-cols-3">
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                </div>
-                <Bell className="h-8 w-8 text-primary/20" />
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total</CardTitle>
+              <Bell className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{notifications.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Todas as notificações
+              </p>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Não Lidas</p>
-                  <p className="text-2xl font-bold">{stats.unread}</p>
-                </div>
-                <Clock className="h-8 w-8 text-yellow-500/20" />
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Não Lidas</CardTitle>
+              <Mail className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{unreadCount}</div>
+              <p className="text-xs text-muted-foreground">
+                Pendentes de leitura
+              </p>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Lidas</p>
-                  <p className="text-2xl font-bold">{stats.read}</p>
-                </div>
-                <CheckCheck className="h-8 w-8 text-green-500/20" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Lidas</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {notifications.length - unreadCount}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Já visualizadas
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar notificações..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => {
-                    setCategoryFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="h-9 px-3 rounded-md border border-input bg-transparent text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="todas">Todas Categorias</option>
-                  <option value="general">Geral</option>
-                  <option value="project">Projeto</option>
-                  <option value="client">Cliente</option>
-                  <option value="budget">Orçamento</option>
-                  <option value="task">Tarefa</option>
-                </select>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="h-9 px-3 rounded-md border border-input bg-transparent text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="todas">Todos Status</option>
-                  <option value="unread">Não Lidas</option>
-                  <option value="read">Lidas</option>
-                </select>
-                {stats.unread > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleMarkAllAsRead}
-                    className="gap-1"
-                  >
-                    <CheckCheck className="h-4 w-4" />
-                    Marcar todas como lidas
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Filtros */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={filter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilter("all")}
+          >
+            Todas
+          </Button>
+          <Button
+            variant={filter === "unread" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilter("unread")}
+          >
+            Não lidas
+            {unreadCount > 0 && (
+              <Badge className="ml-2 bg-blue-600">{unreadCount}</Badge>
+            )}
+          </Button>
+          <Button
+            variant={filter === "read" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilter("read")}
+          >
+            Lidas
+          </Button>
+        </div>
 
-        {/* Notifications List */}
+        {/* Lista de Notificações */}
         {isLoading ? (
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-center h-32">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-              </div>
+            <CardContent className="py-12 flex items-center justify-center">
+              <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full" />
             </CardContent>
           </Card>
-        ) : paginatedNotifications.length === 0 ? (
+        ) : filteredNotifications.length === 0 ? (
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                <Bell className="h-12 w-12 mb-2 opacity-50" />
-                <p>Nenhuma notificação encontrada</p>
-              </div>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <Bell className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">
+                {filter === "unread"
+                  ? "Nenhuma notificação não lida"
+                  : filter === "read"
+                  ? "Nenhuma notificação lida"
+                  : "Nenhuma notificação"}
+              </p>
+              <p className="text-sm">
+                {filter === "unread"
+                  ? "Você está em dia com suas notificações!"
+                  : "As notificações aparecerão aqui"}
+              </p>
             </CardContent>
           </Card>
         ) : (
-          <>
-            <div className="space-y-2">
-              {paginatedNotifications.map((notification) => {
-                const Icon = categoryIcons[notification.category] || Bell;
-                const colorClass = typeColors[notification.type] || typeColors.info;
-                
-                return (
+          <div className="space-y-3">
+            {filteredNotifications.map((notification) => {
+              const config = typeConfig[notification.type] || typeConfig.info;
+              const categoryConfigItem = categoryConfig[notification.category] || categoryConfig.general;
+
+              return (
+                <motion.div
+                  key={notification.id}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
                   <Card
-                    key={notification.id}
-                    className={`transition-all hover:shadow-md ${
-                      !notification.read ? "border-l-4 border-l-primary bg-accent/50" : ""
+                    className={`cursor-pointer transition-all hover:shadow-md ${
+                      !notification.read
+                        ? "border-l-4 border-l-blue-600 bg-blue-50/50 dark:bg-blue-950/10"
+                        : ""
                     }`}
+                    onClick={() => handleNotificationClick(notification)}
                   >
-                    <CardContent className="pt-4">
-                      <div className="flex items-start gap-3">
-                        <div className={`h-3 w-3 rounded-full mt-1.5 flex-shrink-0 ${colorClass}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className={`font-medium ${!notification.read ? "text-primary" : ""}`}>
-                                  {notification.title}
-                                </p>
-                                <Badge variant="outline" className="text-xs">
-                                  {categoryLabels[notification.category]}
-                                </Badge>
-                                {!notification.read && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Nova
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {notification.message}
-                              </p>
-                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {formatDistanceToNow(new Date(notification.createdAt), {
-                                    addSuffix: true,
-                                    locale: ptBR,
-                                  })}
-                                </span>
-                                {notification.link && (
-                                  <span className="flex items-center gap-1">
-                                    <ExternalLink className="h-3 w-3" />
-                                    <a
-                                      href={notification.link}
-                                      className="text-primary hover:underline"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleMarkAsRead(notification.id);
-                                      }}
-                                    >
-                                      Ver detalhes
-                                    </a>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-1 flex-shrink-0">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-4">
+                        {/* Ícone */}
+                        <div
+                          className={`p-2 rounded-full ${config.color} flex-shrink-0`}
+                        >
+                          {config.icon}
+                        </div>
+
+                        {/* Conteúdo */}
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold">{notification.title}</h3>
                               {!notification.read && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => handleMarkAsRead(notification.id)}
-                                  title="Marcar como lida"
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
+                                <Badge className="bg-blue-600 text-xs">Nova</Badge>
                               )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(notification.createdAt).toLocaleString("pt-BR")}
+                              </span>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDelete(notification.id)}
-                                title="Excluir"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteNotification(notification.id);
+                                }}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
+                          </div>
+
+                          <p className="text-sm text-muted-foreground">
+                            {notification.message}
+                          </p>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {categoryConfigItem.icon}
+                              <span className="ml-1 capitalize">{notification.category}</span>
+                            </Badge>
+                            {!notification.read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMarkAsRead(notification.id);
+                                }}
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Marcar como lida
+                              </Button>
+                            )}
+                            {notification.link && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = notification.link!;
+                                }}
+                              >
+                                Abrir
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Anterior
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Página {currentPage} de {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Próxima
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </>
+                </motion.div>
+              );
+            })}
+          </div>
         )}
-      </motion.div>
+      </div>
     </DashboardLayout>
   );
 }

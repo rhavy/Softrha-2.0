@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import Stripe from "stripe";
+import { createLog } from "@/lib/create-log";
+import { createNotificationForAdmins } from "@/lib/create-notification";
 
 const resend = process.env.RESEND_API_KEY ? new (require("resend").Resend)(process.env.RESEND_API_KEY) : null;
 
@@ -358,7 +360,7 @@ async function handleDownPayment(payment: any, budget: any) {
 
   // Buscar primeiro usuário admin para usar como criador
   const adminUser = await prisma.user.findFirst({
-    where: { role: "admin" },
+    where: { role: "ADMIN" },
   });
 
   // Mapear complexidade
@@ -453,6 +455,45 @@ async function handleDownPayment(payment: any, budget: any) {
 
   console.log(`[Webhook] === FIM handleDownPayment ===`);
   console.log(`[Webhook] Pagamento e orçamento vinculados ao projeto ${project.id}.`);
+
+  // Criar log de pagamento confirmado
+  await createLog({
+    type: "PAYMENT",
+    category: "PAYMENT",
+    level: "SUCCESS",
+    entityId: payment.id,
+    entityType: "Payment",
+    action: "Pagamento da entrada confirmado",
+    description: `Pagamento da entrada (25%) confirmado para o orçamento ${budget.id}. Cliente: ${budget.clientName}, Valor: R$ ${payment.amount}.`,
+    metadata: {
+      budgetId: budget.id,
+      projectId: project.id,
+      paymentId: payment.id,
+      paymentType: "down_payment",
+      amount: payment.amount,
+      clientName: budget.clientName,
+      clientEmail: budget.clientEmail,
+    },
+  });
+
+  // Criar notificação para todos os usuários admin
+  await createNotificationForAdmins({
+    title: "Pagamento da Entrada Confirmado! 🎉",
+    message: `O cliente ${budget.clientName} realizou o pagamento da entrada (25%) do projeto "${budget.projectType}". Valor: R$ ${(budget.finalValue || 0) * 0.25}.`,
+    type: "success",
+    category: "budget",
+    link: `/dashboard/orcamentos/${budget.id}`,
+    metadata: {
+      budgetId: budget.id,
+      projectId: project.id,
+      paymentId: payment.id,
+      paymentType: "down_payment",
+      amount: payment.amount,
+      clientName: budget.clientName,
+    },
+  });
+
+  console.log(`[Webhook] Log e notificações criados com sucesso.`);
 
   // Enviar e-mail de confirmação
   if (budget.clientEmail && resend) {

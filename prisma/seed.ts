@@ -16,7 +16,7 @@ async function main() {
       email: "admin@softrha.com",
       name: "Admin SoftRha",
       password: hashedPassword,
-      role: "admin",
+      role: "ADMIN",
       emailVerified: true,
     },
   });
@@ -31,7 +31,7 @@ async function main() {
       email: "usuario@softrha.com",
       name: "Usuário Exemplo",
       password: hashedPassword,
-      role: "user",
+      role: "USER",
       emailVerified: true,
     },
   });
@@ -383,37 +383,47 @@ async function main() {
 
   console.log("✅ Orçamentos adicionais criados");
 
-  // Criar membros da equipe de exemplo
-  await prisma.teamMember.createMany({
+  // Criar membros da equipe de exemplo (TEAM_MEMBER)
+  await prisma.user.createMany({
     data: [
       {
         name: "Ana Silva",
-        role: "Desenvolvedora Frontend",
         email: "ana@softrha.com",
+        password: "membro123",
+        role: "TEAM_MEMBER",
+        teamRole: "Desenvolvedora Frontend",
         phone: "(11) 99999-1111",
         status: "active",
-        skills: JSON.stringify(["React", "TypeScript", "TailwindCSS"]),
-        projects: 3,
+        skills: ["React", "TypeScript", "TailwindCSS"],
+        projectsCount: 3,
+        emailVerified: true,
       },
       {
         name: "Bruno Costa",
-        role: "Desenvolvedor Backend",
         email: "bruno@softrha.com",
+        password: "membro123",
+        role: "TEAM_MEMBER",
+        teamRole: "Desenvolvedor Backend",
         phone: "(11) 99999-2222",
         status: "active",
-        skills: JSON.stringify(["Node.js", "Python", "PostgreSQL"]),
-        projects: 4,
+        skills: ["Node.js", "Python", "PostgreSQL"],
+        projectsCount: 4,
+        emailVerified: true,
       },
       {
         name: "Carla Mendes",
-        role: "Designer UI/UX",
         email: "carla@softrha.com",
+        password: "membro123",
+        role: "TEAM_MEMBER",
+        teamRole: "Designer UI/UX",
         phone: "(11) 99999-3333",
         status: "busy",
-        skills: JSON.stringify(["Figma", "Adobe XD", "Design System"]),
-        projects: 2,
+        skills: ["Figma", "Adobe XD", "Design System"],
+        projectsCount: 2,
+        emailVerified: true,
       },
     ],
+    skipDuplicates: true,
   });
 
   console.log("✅ Membros da equipe criados");

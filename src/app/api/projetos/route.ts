@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { notifyNewProject } from "@/lib/notifications";
+import { auth } from "@/lib/auth";
+import { createLog } from "@/lib/create-log";
+import { createNotificationForAdmins } from "@/lib/create-notification";
 
 // GET - Listar todos os projetos
 export async function GET(request: NextRequest) {
   try {
-    // Para desenvolvimento, vamos permitir sem autenticação
-    // Em produção, adicione a verificação de sessão
+    const sessionData = await auth.api.getSession({ headers: request.headers });
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
@@ -14,7 +16,6 @@ export async function GET(request: NextRequest) {
     const where: any = {};
 
     if (status && status !== "todos") {
-      // Mapear status do frontend para o banco
       const statusMap: Record<string, string> = {
         "Planejamento": "planning",
         "Em Desenvolvimento": "development",
@@ -46,7 +47,19 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Mapear status do banco para o frontend
+    // Criar log de visualização
+    if (sessionData?.session) {
+      await createLog({
+        type: "VIEW",
+        category: "PROJECT",
+        level: "INFO",
+        userId: sessionData.session.userId,
+        action: "Listar projetos",
+        description: `Usuário visualizou a lista de projetos${search ? ` (busca: ${search})` : ""}`,
+        metadata: { filters: { status, search }, totalProjects: projects.length },
+      });
+    }
+
     const frontendStatusMap: Record<string, string> = {
       "planning": "Planejamento",
       "development": "Em Desenvolvimento",
@@ -55,7 +68,6 @@ export async function GET(request: NextRequest) {
       "cancelled": "Cancelado",
     };
 
-    // Formatar os dados para o frontend
     const formattedProjects = projects.map((project: any) => {
       const completedTasks = project.tasks.filter((t: any) => t.status === "done").length;
       const techArray = project.tech ? JSON.parse(project.tech) : [];
@@ -84,6 +96,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(formattedProjects);
   } catch (error) {
     console.error("Erro ao buscar projetos:", error);
+    await createLog({
+      type: "SYSTEM",
+      category: "PROJECT",
+      level: "ERROR",
+      action: "Erro ao listar projetos",
+      description: `Erro: ${error instanceof Error ? error.message : String(error)}`,
+    });
     return NextResponse.json(
       { error: "Erro ao buscar projetos: " + (error as any).message },
       { status: 500 }
@@ -94,10 +113,9 @@ export async function GET(request: NextRequest) {
 // POST - Criar novo projeto
 export async function POST(request: NextRequest) {
   try {
+    const sessionData = await auth.api.getSession({ headers: request.headers });
     const body = await request.json();
-    const { name, clientId, client, description, status, tech, dueDate } = body;
-
-    console.log("Dados recebidos:", body);
+    const { name, clientId, client, description, status, tech, dueDate, budget } = body;
 
     // Validação básica
     if (!name || (!clientId && !client)) {
@@ -107,7 +125,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mapear status do frontend para o banco
     const statusMap: Record<string, string> = {
       "Planejamento": "planning",
       "Em Desenvolvimento": "development",
@@ -117,17 +134,14 @@ export async function POST(request: NextRequest) {
 
     const dbStatus = statusMap[status] || "planning";
 
-    // Buscar primeiro usuário para associar (em produção, usar session.user.id)
-    const firstUser = await prisma.user.findFirst();
-    
-    if (!firstUser) {
+    const userId = sessionData?.session?.userId;
+    if (!userId) {
       return NextResponse.json(
-        { error: "Nenhum usuário encontrado. Crie uma conta primeiro." },
-        { status: 400 }
+        { error: "Não autorizado" },
+        { status: 401 }
       );
     }
 
-    // Se clientId não foi fornecido, buscar pelo nome do cliente
     let finalClientId = clientId;
     if (!finalClientId && client) {
       const foundClient = await prisma.client.findFirst({
@@ -145,12 +159,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar cliente para obter nome
     const clientData = await prisma.client.findUnique({
       where: { id: finalClientId },
     });
 
-    // Criar projeto
     const project = await prisma.project.create({
       data: {
         name,
@@ -161,15 +173,47 @@ export async function POST(request: NextRequest) {
         complexity: "medium",
         timeline: "normal",
         tech: tech && tech.length > 0 ? JSON.stringify(tech) : null,
+        budget: budget || null,
         progress: 0,
         dueDate: dueDate ? new Date(dueDate) : null,
         clientId: finalClientId,
-        createdById: firstUser.id,
+        createdById: userId,
       },
     });
 
-    // Enviar notificação para todos os admins
-    await notifyNewProject(project.id, project.name, clientData?.name || client);
+    // Criar log de criação
+    await createLog({
+      type: "CREATE",
+      category: "PROJECT",
+      level: "SUCCESS",
+      userId,
+      entityId: project.id,
+      entityType: "Project",
+      action: "Projeto criado",
+      description: `Novo projeto "${name}" criado para o cliente ${clientData?.name || client}`,
+      metadata: {
+        projectId: project.id,
+        clientName: clientData?.name || client,
+        status: dbStatus,
+        budget,
+        tech,
+      },
+      changes: { before: null, after: project },
+    });
+
+    // Criar notificação para todos os admins
+    await createNotificationForAdmins({
+      title: "Novo Projeto Criado! 🚀",
+      message: `O projeto "${name}" foi criado para ${clientData?.name || client}.`,
+      type: "success",
+      category: "project",
+      link: `/dashboard/projetos/${project.id}`,
+      metadata: {
+        projectId: project.id,
+        projectName: name,
+        clientName: clientData?.name || client,
+      },
+    });
 
     return NextResponse.json({
       id: project.id,
@@ -183,6 +227,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erro ao criar projeto:", error);
+    await createLog({
+      type: "SYSTEM",
+      category: "PROJECT",
+      level: "ERROR",
+      action: "Erro ao criar projeto",
+      description: `Erro: ${error instanceof Error ? error.message : String(error)}`,
+      metadata: { body: await request.json().catch(() => ({}) ) },
+    });
     return NextResponse.json(
       { error: "Erro ao criar projeto: " + (error as any).message },
       { status: 500 }

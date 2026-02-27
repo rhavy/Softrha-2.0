@@ -5,28 +5,21 @@ import { auth } from "@/lib/auth";
 // GET - Listar notificações do usuário
 export async function GET(request: NextRequest) {
   try {
-    console.log('[NOTIFICAÇÕES API] 🔍 Iniciando GET /api/notificacoes');
-    
     const sessionData = await auth.api.getSession({ headers: request.headers });
-    console.log('[NOTIFICAÇÕES API] 📋 Session data:', sessionData ? 'presente' : 'ausente');
 
     if (!sessionData?.session) {
-      console.log('[NOTIFICAÇÕES API] ❌ Usuário não autenticado');
       return NextResponse.json(
-        { error: "Não autorizado", details: "Session not found" },
+        { error: "Não autorizado" },
         { status: 401 }
       );
     }
 
     const session = sessionData.session;
-    console.log('[NOTIFICAÇÕES API] ✅ Usuário autenticado:', session.userId);
-    
+
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get("unread") === "true";
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const limit = parseInt(searchParams.get("limit") || "50");
     const category = searchParams.get("category");
-
-    console.log('[NOTIFICAÇÕES API] 📊 Parâmetros:', { unreadOnly, limit, category });
 
     const notifications = await prisma.notification.findMany({
       where: {
@@ -38,23 +31,11 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
-    const unreadCount = await prisma.notification.count({
-      where: {
-        userId: session.userId,
-        read: false,
-      },
-    });
-
-    console.log('[NOTIFICAÇÕES API] 📬 Notificações encontradas:', notifications.length);
-
-    return NextResponse.json({
-      notifications,
-      unreadCount,
-    });
+    return NextResponse.json(notifications);
   } catch (error) {
-    console.error("[NOTIFICAÇÕES API] ❌ Erro ao buscar notificações:", error);
+    console.error("Erro ao buscar notificações:", error);
     return NextResponse.json(
-      { error: "Erro ao buscar notificações", details: error instanceof Error ? error.message : String(error) },
+      { error: "Erro ao buscar notificações" },
       { status: 500 }
     );
   }
@@ -63,19 +44,28 @@ export async function GET(request: NextRequest) {
 // POST - Criar nova notificação
 export async function POST(request: NextRequest) {
   try {
+    const sessionData = await auth.api.getSession({ headers: request.headers });
+
+    if (!sessionData?.session) {
+      return NextResponse.json(
+        { error: "Não autorizado" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { userId, title, message, type, category, link, metadata } = body;
 
-    if (!userId || !title || !message) {
+    if (!title || !message) {
       return NextResponse.json(
-        { error: "Campos obrigatórios faltando" },
+        { error: "Título e mensagem são obrigatórios" },
         { status: 400 }
       );
     }
 
     const notification = await prisma.notification.create({
       data: {
-        userId,
+        userId: userId || sessionData.session.userId,
         title,
         message,
         type: type || "info",

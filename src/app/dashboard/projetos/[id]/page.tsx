@@ -39,6 +39,8 @@ import {
   Code,
   GitBranch,
   Globe,
+  Edit3,
+  History,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -71,6 +73,9 @@ interface Project {
   completedAt?: string | null;
   gitRepositoryUrl?: string | null;
   testUrl?: string | null;
+  lastUrlChangeReason?: string | null;
+  lastUrlChangeDescription?: string | null;
+  lastUrlChangedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   client?: {
@@ -160,6 +165,19 @@ export default function ProjetoDetalhesPage() {
   const [isHistoryDetailDialogOpen, setIsHistoryDetailDialogOpen] = useState(false);
   const [gitRepositoryUrl, setGitRepositoryUrl] = useState("");
   const [testUrl, setTestUrl] = useState("");
+  
+  // Estados para edição de URL com justificativa
+  const [isEditUrlDialogOpen, setIsEditUrlDialogOpen] = useState(false);
+  const [urlFieldToEdit, setUrlFieldToEdit] = useState<"git" | "test" | null>(null);
+  const [newUrlValue, setNewUrlValue] = useState("");
+  const [urlChangeReason, setUrlChangeReason] = useState<string>("");
+  const [urlChangeDescription, setUrlChangeDescription] = useState("");
+  const [isUpdatingUrl, setIsUpdatingUrl] = useState(false);
+  
+  // Estados para histórico de URL
+  const [urlHistory, setUrlHistory] = useState<any[]>([]);
+  const [isUrlHistoryDialogOpen, setIsUrlHistoryDialogOpen] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Mapear motivos técnicos para texto legível
   const getReasonLabel = (reason: string) => {
@@ -509,6 +527,80 @@ export default function ProjetoDetalhesPage() {
       });
     } finally {
       setIsNotifyingProgress(false);
+    }
+  };
+
+  const handleUpdateUrlWithJustification = async () => {
+    try {
+      setIsUpdatingUrl(true);
+
+      if (!urlChangeReason) {
+        toast({
+          title: "Justificativa necessária",
+          description: "Selecione um motivo para justificar a alteração da URL.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`/api/projetos/${params.id}/atualizar-url`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          field: urlFieldToEdit,
+          url: newUrlValue,
+          reason: urlChangeReason,
+          description: urlChangeDescription,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao atualizar URL");
+      }
+
+      // Atualizar estado local do projeto
+      if (urlFieldToEdit === "git") {
+        setProject((prev) => prev ? { ...prev, gitRepositoryUrl: newUrlValue } : null);
+      } else if (urlFieldToEdit === "test") {
+        setProject((prev) => prev ? { ...prev, testUrl: newUrlValue } : null);
+      }
+
+      toast({
+        title: "URL atualizada!",
+        description: "A alteração foi registrada com sucesso.",
+      });
+
+      // Fechar dialog e limpar estados
+      setIsEditUrlDialogOpen(false);
+      setUrlFieldToEdit(null);
+      setNewUrlValue("");
+      setUrlChangeReason("");
+      setUrlChangeDescription("");
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao atualizar URL",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingUrl(false);
+    }
+  };
+
+  const fetchUrlHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      const response = await fetch(`/api/projetos/${params.id}/historico-url`);
+      if (!response.ok) throw new Error("Erro ao buscar histórico");
+      const data = await response.json();
+      setUrlHistory(data.history || []);
+    } catch (error) {
+      console.error("Erro ao buscar histórico de URL:", error);
+      setUrlHistory([]);
+    } finally {
+      setIsLoadingHistory(false);
     }
   };
 
@@ -1078,9 +1170,38 @@ export default function ProjetoDetalhesPage() {
                       {/* Git URL */}
                       {project.gitRepositoryUrl && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <GitBranch className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm font-semibold">Repositório do Projeto</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <GitBranch className="h-4 w-4 text-muted-foreground" />
+                              <p className="text-sm font-semibold">Repositório do Projeto</p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => {
+                                  fetchUrlHistory();
+                                  setIsUrlHistoryDialogOpen(true);
+                                }}
+                              >
+                                <History className="h-3.5 w-3.5 mr-1" />
+                                Histórico
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => {
+                                  setUrlFieldToEdit("git");
+                                  setNewUrlValue(project.gitRepositoryUrl || "");
+                                  setIsEditUrlDialogOpen(true);
+                                }}
+                              >
+                                <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                Editar
+                              </Button>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md">
                             <Code className="h-4 w-4 text-slate-400 flex-shrink-0" />
@@ -1127,10 +1248,39 @@ export default function ProjetoDetalhesPage() {
                       {/* Test URL */}
                       {project.testUrl && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Globe className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm font-semibold">URL de Teste</p>
-                            <Badge variant="secondary" className="text-[10px]">Preview</Badge>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-4 w-4 text-muted-foreground" />
+                              <p className="text-sm font-semibold">URL de Teste</p>
+                              <Badge variant="secondary" className="text-[10px]">Preview</Badge>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => {
+                                  fetchUrlHistory();
+                                  setIsUrlHistoryDialogOpen(true);
+                                }}
+                              >
+                                <History className="h-3.5 w-3.5 mr-1" />
+                                Histórico
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => {
+                                  setUrlFieldToEdit("test");
+                                  setNewUrlValue(project.testUrl || "");
+                                  setIsEditUrlDialogOpen(true);
+                                }}
+                              >
+                                <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                Editar
+                              </Button>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
                             <Globe className="h-4 w-4 text-emerald-600 flex-shrink-0" />
@@ -2697,6 +2847,285 @@ export default function ProjetoDetalhesPage() {
             
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsHistoryDetailDialogOpen(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Justificativa para Alteração de URL */}
+        <Dialog open={isEditUrlDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setIsEditUrlDialogOpen(false);
+            setUrlFieldToEdit(null);
+            setNewUrlValue("");
+            setUrlChangeReason("");
+            setUrlChangeDescription("");
+          } else {
+            setIsEditUrlDialogOpen(true);
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Edit3 className="h-5 w-5 text-amber-600" />
+                Justificar Alteração de URL
+              </DialogTitle>
+              <DialogDescription>
+                {urlFieldToEdit === "git" 
+                  ? "Informe a justificativa para alterar o repositório do projeto"
+                  : "Informe a justificativa para alterar a URL de teste preview"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {/* Nova URL */}
+              <div className="space-y-2">
+                <Label htmlFor="newUrl" className="font-semibold">
+                  {urlFieldToEdit === "git" ? "Novo Repositório" : "Nova URL de Teste"}
+                </Label>
+                <div className="relative">
+                  {urlFieldToEdit === "git" ? (
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Code className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Globe className="h-4 w-4" />
+                    </div>
+                  )}
+                  <Input
+                    id="newUrl"
+                    placeholder={urlFieldToEdit === "git" 
+                      ? "https://github.com/usuario/projeto"
+                      : "https://projeto-teste.vercel.app"
+                    }
+                    value={newUrlValue}
+                    onChange={(e) => setNewUrlValue(e.target.value)}
+                    className={urlFieldToEdit === "git" ? "pl-10" : "pl-10"}
+                  />
+                </div>
+              </div>
+
+              {/* Select de Justificativa */}
+              <div className="space-y-2">
+                <Label htmlFor="reason" className="font-semibold flex items-center gap-1">
+                  Motivo da Alteração
+                  <span className="text-red-600">*</span>
+                </Label>
+                <Select value={urlChangeReason} onValueChange={setUrlChangeReason}>
+                  <SelectTrigger id="reason">
+                    <SelectValue placeholder="Selecione um motivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="migracao_repositorio">Migração de Repositório</SelectItem>
+                    <SelectItem value="mudanca_plataforma">Mudança de Plataforma</SelectItem>
+                    <SelectItem value="atualizacao_ambiente">Atualização de Ambiente</SelectItem>
+                    <SelectItem value="erro_url_anterior">Erro na URL Anterior</SelectItem>
+                    <SelectItem value="solicitacao_cliente">Solicitação do Cliente</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Descrição/Obs Opcional */}
+              <div className="space-y-2">
+                <Label htmlFor="description" className="font-semibold">
+                  Observações Adicionais
+                  <span className="text-muted-foreground font-normal ml-1">(opcional)</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  placeholder="Descreva detalhes sobre a alteração..."
+                  value={urlChangeDescription}
+                  onChange={(e) => setUrlChangeDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  ⚠️ Esta alteração será registrada no histórico do projeto.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditUrlDialogOpen(false);
+                  setUrlFieldToEdit(null);
+                  setNewUrlValue("");
+                  setUrlChangeReason("");
+                  setUrlChangeDescription("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUpdateUrlWithJustification}
+                disabled={isUpdatingUrl || !newUrlValue.trim() || !urlChangeReason}
+              >
+                {isUpdatingUrl ? "Atualizando..." : "Atualizar URL"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Histórico de Alterações de URL */}
+        <Dialog open={isUrlHistoryDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setIsUrlHistoryDialogOpen(false);
+            setUrlHistory([]);
+          } else {
+            setIsUrlHistoryDialogOpen(true);
+          }
+        }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="h-5 w-5 text-blue-600" />
+                Histórico de Alterações de URL
+              </DialogTitle>
+              <DialogDescription>
+                Todas as alterações de repositório e URL de teste do projeto
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              {isLoadingHistory ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full" />
+                </div>
+              ) : urlHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <History className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nenhuma alteração registrada</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    As alterações de URL aparecerão aqui
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                  {urlHistory.map((item, index) => {
+                    const isGit = item.field === "git";
+                    const reasonLabels: Record<string, string> = {
+                      migracao_repositorio: "Migração de Repositório",
+                      mudanca_plataforma: "Mudança de Plataforma",
+                      atualizacao_ambiente: "Atualização de Ambiente",
+                      erro_url_anterior: "Erro na URL Anterior",
+                      solicitacao_cliente: "Solicitação do Cliente",
+                      outro: "Outro",
+                    };
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3"
+                      >
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`p-2 rounded-md ${
+                              isGit 
+                                ? "bg-slate-100 dark:bg-slate-800" 
+                                : "bg-emerald-100 dark:bg-emerald-950/20"
+                            }`}>
+                              {isGit ? (
+                                <Code className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                              ) : (
+                                <Globe className="h-4 w-4 text-emerald-600" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm">
+                                {isGit ? "Repositório Git" : "URL de Teste"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(item.createdAt).toLocaleDateString("pt-BR", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            #{urlHistory.length - index}
+                          </Badge>
+                        </div>
+
+                        {/* URLs */}
+                        <div className="space-y-2">
+                          {item.oldUrl && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs font-medium text-red-600 flex-shrink-0 mt-0.5">
+                                Anterior:
+                              </span>
+                              <a
+                                href={item.oldUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-red-600 hover:underline line-through"
+                              >
+                                {item.oldUrl}
+                              </a>
+                            </div>
+                          )}
+                          <div className="flex items-start gap-2">
+                            <span className="text-xs font-medium text-green-600 flex-shrink-0 mt-0.5">
+                              Nova:
+                            </span>
+                            <a
+                              href={item.newUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-green-600 hover:underline"
+                            >
+                              {item.newUrl}
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Motivo */}
+                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+                          <div className="flex items-start gap-2">
+                            <span className="text-xs font-semibold text-amber-800 dark:text-amber-200 flex-shrink-0">
+                              Motivo:
+                            </span>
+                            <span className="text-xs text-amber-900 dark:text-amber-100">
+                              {reasonLabels[item.reason] || item.reason}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Descrição */}
+                        {item.description && (
+                          <div className="bg-slate-50 dark:bg-slate-900 rounded-md p-3">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">
+                                Observações:
+                              </span>
+                              <p className="text-xs text-slate-900 dark:text-slate-100 whitespace-pre-wrap">
+                                {item.description}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsUrlHistoryDialogOpen(false);
+                  setUrlHistory([]);
+                }}
+              >
                 Fechar
               </Button>
             </DialogFooter>

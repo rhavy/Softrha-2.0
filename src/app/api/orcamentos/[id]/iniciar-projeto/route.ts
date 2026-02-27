@@ -93,7 +93,7 @@ export async function POST(
 
     // Buscar primeiro usuário admin para usar como criador
     const adminUser = await prisma.user.findFirst({
-      where: { role: "admin" },
+      where: { role: "ADMIN" },
     });
 
     // Criar projeto aguardando pagamento

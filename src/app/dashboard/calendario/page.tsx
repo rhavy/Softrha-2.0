@@ -1,7 +1,7 @@
 "use client";
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -36,6 +36,7 @@ const eventColors: Record<string, string> = {
   deploy: "bg-green-500",
   planning: "bg-indigo-500",
   deadline: "bg-red-500",
+  delivery: "bg-emerald-500", // Entrega de projeto
 };
 
 const eventLabels: Record<string, string> = {
@@ -45,6 +46,7 @@ const eventLabels: Record<string, string> = {
   deploy: "Deploy",
   planning: "Planejamento",
   deadline: "Entrega",
+  delivery: "Entrega de Projeto", // Entrega de projeto
 };
 
 const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -62,22 +64,33 @@ export default function DashboardCalendario() {
   const [eventToEdit, setEventToEdit] = useState<any>(null);
   const [eventToDelete, setEventToDelete] = useState<any>(null);
   const [eventsList, setEventsList] = useState<any[]>([]);
+  const [schedulesList, setSchedulesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Carregar eventos do banco de dados
+  // Carregar eventos e agendamentos do banco de dados
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/eventos");
-      if (!response.ok) {
-        const errorData = await response.json();
+      const [eventsResponse, schedulesResponse] = await Promise.all([
+        fetch("/api/eventos"),
+        fetch("/api/agendamentos"),
+      ]);
+
+      if (!eventsResponse.ok) {
+        const errorData = await eventsResponse.json();
         throw new Error(errorData.error || "Erro ao buscar eventos");
       }
-      const data = await response.json();
-      setEventsList(data);
+      const eventsData = await eventsResponse.json();
+      setEventsList(eventsData);
+
+      if (schedulesResponse.ok) {
+        const schedulesData = await schedulesResponse.json();
+        setSchedulesList(schedulesData);
+      }
     } catch (error) {
-      console.error("Erro ao carregar eventos:", error);
+      console.error("Erro ao carregar eventos/agendamentos:", error);
       setEventsList([]);
+      setSchedulesList([]);
     } finally {
       setLoading(false);
     }
@@ -100,8 +113,36 @@ export default function DashboardCalendario() {
         throw new Error(errorData.error || "Erro ao criar evento");
       }
 
+      // Enviar notificações para os participantes
+      if (data.participants && data.participants.length > 0) {
+        await fetch("/api/notificacoes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            participants: data.participants,
+            title: "Novo Evento Adicionado",
+            message: `Você foi convidado para o evento: ${data.title}`,
+            type: "info",
+            category: "general",
+            link: "/dashboard/calendario",
+            metadata: {
+              eventId: data.id,
+              eventTitle: data.title,
+              eventDate: data.date,
+              eventTime: data.time,
+            },
+          }),
+        });
+      }
+
       await fetchEvents();
       setModalOpen(false);
+      toast({
+        title: "Evento criado!",
+        description: data.participants?.length > 0 
+          ? "Evento criado e notificações enviadas aos participantes."
+          : "Evento criado com sucesso.",
+      });
     } catch (error) {
       console.error("Erro ao criar evento:", error);
       toast({
@@ -192,7 +233,9 @@ export default function DashboardCalendario() {
 
   const getEventsForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return eventsList.filter(event => event.date === dateStr);
+    const events = eventsList.filter(event => event.date === dateStr);
+    const schedules = schedulesList.filter(schedule => schedule.date === dateStr);
+    return [...events, ...schedules];
   };
 
   const isToday = (day: number) => {
@@ -200,7 +243,7 @@ export default function DashboardCalendario() {
     return day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
   };
 
-  const upcomingEvents = eventsList
+  const upcomingEvents = [...eventsList, ...schedulesList]
     .filter(event => new Date(event.date) >= new Date())
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
@@ -320,61 +363,81 @@ export default function DashboardCalendario() {
           {/* Upcoming Events */}
           <Card>
             <CardDescription className="p-6 pb-3">
-              Próximos Eventos
+              Próximos Eventos e Agendamentos
             </CardDescription>
             <CardContent className="space-y-4">
-              {upcomingEvents.map((event) => (
-                <motion.div
-                  key={event.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow"
-                >
-                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${eventColors[event.type]} bg-opacity-20`}>
-                    {event.type === "meeting" && <Users className="h-5 w-5" />}
-                    {event.type === "review" && <Calendar className="h-5 w-5" />}
-                    {event.type === "presentation" && <Video className="h-5 w-5" />}
-                    {event.type === "deploy" && <Clock className="h-5 w-5" />}
-                    {event.type === "planning" && <Calendar className="h-5 w-5" />}
-                    {event.type === "deadline" && <Clock className="h-5 w-5" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{event.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                      <Clock className="h-3 w-3" />
-                      <span>{event.time}</span>
-                      <span>•</span>
-                      <span>{new Date(event.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                      {event.location !== "-" ? (
-                        <>
-                          <MapPin className="h-3 w-3" />
-                          <span>{event.location}</span>
-                        </>
+              {upcomingEvents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Nenhum evento ou agendamento próximo</p>
+                </div>
+              ) : (
+                upcomingEvents.map((event) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow"
+                  >
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${eventColors[event.type]} bg-opacity-20`}>
+                      {event.type === "delivery" ? (
+                        <Calendar className="h-5 w-5" />
+                      ) : event.type === "meeting" ? (
+                        <Users className="h-5 w-5" />
+                      ) : event.type === "review" ? (
+                        <Calendar className="h-5 w-5" />
+                      ) : event.type === "presentation" ? (
+                        <Video className="h-5 w-5" />
+                      ) : event.type === "deploy" ? (
+                        <Clock className="h-5 w-5" />
+                      ) : event.type === "planning" ? (
+                        <Calendar className="h-5 w-5" />
                       ) : (
-                        <span className="italic">Sem local definido</span>
+                        <Clock className="h-5 w-5" />
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleEditEvent(event)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Badge variant="secondary" className="text-xs">
-                      {eventLabels[event.type]}
-                    </Badge>
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{event.title}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{event.time || "Horário não definido"}</span>
+                        <span>•</span>
+                        <span>{new Date(event.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>
+                      </div>
+                      {event.type === "delivery" && event.clientName && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <Users className="h-3 w-3" />
+                          <span>{event.clientName}</span>
+                        </div>
+                      )}
+                      {event.location && event.location !== "-" && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <MapPin className="h-3 w-3" />
+                          <span>{event.location}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {event.type !== "delivery" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEditEvent(event)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Badge variant="secondary" className="text-xs">
+                        {eventLabels[event.type]}
+                      </Badge>
+                    </div>
+                  </motion.div>
+                ))
+              )}
 
               <Button variant="outline" className="w-full mt-4">
-                Ver todos os eventos
+                Ver calendário completo
               </Button>
             </CardContent>
           </Card>
@@ -383,9 +446,14 @@ export default function DashboardCalendario() {
         {/* Selected Day Events */}
         {selectedDate && getEventsForDay(selectedDate).length > 0 && (
           <Card className="mt-6">
-            <CardDescription className="p-6 pb-3">
-              Eventos para {selectedDate} de {monthNames[month]}
-            </CardDescription>
+            <CardHeader>
+              <CardTitle>
+                Eventos para {selectedDate} de {monthNames[month]}
+              </CardTitle>
+              <CardDescription>
+                {getEventsForDay(selectedDate).length} evento(s) e agendamento(s) neste dia
+              </CardDescription>
+            </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {getEventsForDay(selectedDate).map((event) => (
@@ -394,51 +462,97 @@ export default function DashboardCalendario() {
                     className="flex items-center gap-4 p-4 rounded-lg border"
                   >
                     <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${eventColors[event.type]} bg-opacity-20`}>
-                      {event.type === "meeting" && <Users className="h-6 w-6" />}
-                      {event.type === "review" && <Calendar className="h-6 w-6" />}
-                      {event.type === "presentation" && <Video className="h-6 w-6" />}
-                      {event.type === "deploy" && <Clock className="h-6 w-6" />}
-                      {event.type === "planning" && <Calendar className="h-6 w-6" />}
-                      {event.type === "deadline" && <Clock className="h-6 w-6" />}
+                      {event.type === "delivery" ? (
+                        <Calendar className="h-6 w-6" />
+                      ) : event.type === "meeting" ? (
+                        <Users className="h-6 w-6" />
+                      ) : event.type === "review" ? (
+                        <Calendar className="h-6 w-6" />
+                      ) : event.type === "presentation" ? (
+                        <Video className="h-6 w-6" />
+                      ) : event.type === "deploy" ? (
+                        <Clock className="h-6 w-6" />
+                      ) : event.type === "planning" ? (
+                        <Calendar className="h-6 w-6" />
+                      ) : (
+                        <Clock className="h-6 w-6" />
+                      )}
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold">{event.title}</p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {event.time}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {event.location}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          {event.participants.join(", ")}
-                        </span>
+                        {event.time && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            {event.time}
+                          </span>
+                        )}
+                        {event.location && event.location !== "-" && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {event.location}
+                          </span>
+                        )}
+                        {event.participants && (
+                          <span className="flex items-center gap-1">
+                            <Users className="h-4 w-4" />
+                            {event.participants.join(", ")}
+                          </span>
+                        )}
+                        {event.type === "delivery" && event.clientName && (
+                          <span className="flex items-center gap-1">
+                            <Users className="h-4 w-4" />
+                            Cliente: {event.clientName}
+                          </span>
+                        )}
+                        {event.type === "delivery" && event.meetingType && (
+                          <span className="flex items-center gap-1">
+                            <Video className="h-4 w-4" />
+                            {event.meetingType === "video" ? "Vídeo" : "Áudio"}
+                          </span>
+                        )}
                       </div>
+                      {event.type === "delivery" && event.meetingLink && (
+                        <div className="mt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(event.meetingLink, "_blank")}
+                          >
+                            <Video className="h-3 w-3 mr-2" />
+                            Abrir Reunião
+                          </Button>
+                        </div>
+                      )}
+                      {event.type === "delivery" && event.notes && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          📝 {event.notes}
+                        </p>
+                      )}
                     </div>
                     <Badge className={eventColors[event.type]}>
                       {eventLabels[event.type]}
                     </Badge>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEditEvent(event)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteClick(event)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {event.type !== "delivery" && (
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEditEvent(event)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteClick(event)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

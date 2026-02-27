@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
+import { useEmailVerification } from "@/hooks/use-email-verification";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -40,6 +41,9 @@ const navItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
+  
+  // Verificação contínua de emailVerified (a cada 5 segundos)
+  useEmailVerification();
 
   return (
     <div className="min-h-screen bg-background">

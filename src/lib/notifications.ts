@@ -53,7 +53,7 @@ export async function createNotificationForUsers(userIds: string[], data: Omit<C
  */
 export async function createNotificationForAdmins(data: Omit<CreateNotificationData, "userId">) {
   const admins = await prisma.user.findMany({
-    where: { role: "admin" },
+    where: { role: "ADMIN" },
     select: { id: true },
   });
 
@@ -88,7 +88,7 @@ export async function notifyNewBudget(
 
   // Enviar email para todos os admins
   const admins = await prisma.user.findMany({
-    where: { role: "admin" },
+    where: { role: "ADMIN" },
     select: { id: true, email: true, name: true },
   });
 

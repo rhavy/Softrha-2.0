@@ -16,6 +16,9 @@ import {
   Calendar,
   Download,
   RefreshCcw,
+  PieChart,
+  BarChart3,
+  AlertCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -52,6 +55,12 @@ interface Stats {
   avgResponseTime: number;
   totalValue: number;
   avgTicket: number;
+  lostValue: number;
+  potentialValue: number;
+  byProjectType: Record<string, number>;
+  byComplexity: Record<string, number>;
+  byTimeline: Record<string, number>;
+  monthlyEvolution: { month: string; count: number; value: number }[];
 }
 
 const statusColors: Record<string, string> = {
@@ -164,6 +173,56 @@ export default function RelatoriosPage() {
     const totalValue = acceptedBudgets.reduce((sum, b) => sum + (b.finalValue || b.estimatedMax), 0);
     const avgTicket = acceptedBudgets.length > 0 ? totalValue / acceptedBudgets.length : 0;
 
+    // Valor perdido (rejeitados)
+    const rejectedBudgets = data.filter((b) => b.status === "rejected");
+    const lostValue = rejectedBudgets.reduce((sum, b) => sum + (b.finalValue || b.estimatedMax), 0);
+
+    // Valor potencial (pendentes)
+    const pendingBudgets = data.filter((b) => b.status === "pending");
+    const potentialValue = pendingBudgets.reduce((sum, b) => sum + (b.estimatedMax), 0);
+
+    // Distribuição por tipo de projeto
+    const byProjectType: Record<string, number> = {};
+    data.forEach((b) => {
+      byProjectType[b.projectType] = (byProjectType[b.projectType] || 0) + 1;
+    });
+
+    // Distribuição por complexidade
+    const byComplexity: Record<string, number> = {};
+    data.forEach((b) => {
+      byComplexity[b.complexity] = (byComplexity[b.complexity] || 0) + 1;
+    });
+
+    // Distribuição por timeline
+    const byTimeline: Record<string, number> = {};
+    data.forEach((b) => {
+      byTimeline[b.timeline] = (byTimeline[b.timeline] || 0) + 1;
+    });
+
+    // Evolução mensal
+    const monthlyEvolutionMap = new Map<string, { count: number; value: number }>();
+    data.forEach((b) => {
+      const date = new Date(b.createdAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      
+      if (!monthlyEvolutionMap.has(monthKey)) {
+        monthlyEvolutionMap.set(monthKey, { count: 0, value: 0 });
+      }
+      const current = monthlyEvolutionMap.get(monthKey)!;
+      current.count += 1;
+      current.value += (b.finalValue || b.estimatedMax);
+    });
+
+    const monthlyEvolution = Array.from(monthlyEvolutionMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-6)
+      .map(([key, data]) => ({
+        month: key.split('-')[1] + '/' + key.split('-')[0].slice(2),
+        count: data.count,
+        value: data.value,
+      }));
+
     setStats({
       total,
       pending,
@@ -179,6 +238,12 @@ export default function RelatoriosPage() {
       avgResponseTime,
       totalValue,
       avgTicket,
+      lostValue,
+      potentialValue,
+      byProjectType,
+      byComplexity,
+      byTimeline,
+      monthlyEvolution,
     });
   };
 
@@ -337,6 +402,40 @@ export default function RelatoriosPage() {
           </Card>
         </div>
 
+        {/* Valor Perdido e Potencial */}
+        <div className="grid gap-4 sm:grid-cols-2 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Valor Perdido (Rejeitados)</CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                R$ {stats.lostValue.toLocaleString("pt-BR")}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {stats.rejected} orçamentos rejeitados
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Valor Potencial (Pendentes)</CardTitle>
+              <TrendingUp className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">
+                R$ {stats.potentialValue.toLocaleString("pt-BR")}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {stats.pending} orçamentos pendentes
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Status Breakdown */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
           {[
@@ -396,6 +495,209 @@ export default function RelatoriosPage() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Distribuição por Tipo de Projeto */}
+        <div className="grid gap-4 sm:grid-cols-2 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PieChart className="h-5 w-5" />
+                Por Tipo de Projeto
+              </CardTitle>
+              <CardDescription>
+                Distribuição dos orçamentos por categoria
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Object.entries(stats.byProjectType)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([type, count]) => {
+                    const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                    const typeLabels: Record<string, string> = {
+                      web: "Website",
+                      mobile: "App Mobile",
+                      software: "Software",
+                      landing: "Landing Page",
+                      ecommerce: "E-commerce",
+                      dashboard: "Dashboard",
+                    };
+                    const colors: Record<string, string> = {
+                      web: "bg-blue-500",
+                      mobile: "bg-purple-500",
+                      software: "bg-indigo-500",
+                      landing: "bg-teal-500",
+                      ecommerce: "bg-orange-500",
+                      dashboard: "bg-pink-500",
+                    };
+                    return (
+                      <div key={type}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium capitalize">
+                            {typeLabels[type] || type}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {count} ({percentage.toFixed(1)}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`${colors[type] || "bg-gray-500"} h-2 rounded-full transition-all duration-500`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Por Complexidade e Prazo
+              </CardTitle>
+              <CardDescription>
+                Distribuição por nível e urgência
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium mb-2">Complexidade</p>
+                  <div className="space-y-2">
+                    {Object.entries(stats.byComplexity).map(([complexity, count]) => {
+                      const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                      const colors: Record<string, string> = {
+                        simple: "bg-green-500",
+                        medium: "bg-amber-500",
+                        complex: "bg-red-500",
+                      };
+                      const labels: Record<string, string> = {
+                        simple: "Simples",
+                        medium: "Médio",
+                        complex: "Complexo",
+                      };
+                      return (
+                        <div key={complexity}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm capitalize">{labels[complexity] || complexity}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {count} ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`${colors[complexity] || "bg-gray-500"} h-2 rounded-full`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t">
+                  <p className="text-sm font-medium mb-2">Prazo</p>
+                  <div className="space-y-2">
+                    {Object.entries(stats.byTimeline).map(([timeline, count]) => {
+                      const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                      const colors: Record<string, string> = {
+                        urgent: "bg-red-500",
+                        normal: "bg-blue-500",
+                        flexible: "bg-green-500",
+                      };
+                      const labels: Record<string, string> = {
+                        urgent: "Urgente",
+                        normal: "Normal",
+                        flexible: "Flexível",
+                      };
+                      return (
+                        <div key={timeline}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm capitalize">{labels[timeline] || timeline}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {count} ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`${colors[timeline] || "bg-gray-500"} h-2 rounded-full`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Evolução Mensal */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Evolução Mensal
+            </CardTitle>
+            <CardDescription>
+              Histórico de orçamentos e valores nos últimos meses
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.monthlyEvolution.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Sem dados para exibir</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {stats.monthlyEvolution.map((month, index) => {
+                  const maxValue = Math.max(...stats.monthlyEvolution.map(m => m.value));
+                  const valuePercentage = maxValue > 0 ? (month.value / maxValue) * 100 : 0;
+                  const maxCount = Math.max(...stats.monthlyEvolution.map(m => m.count));
+                  const countPercentage = maxCount > 0 ? (month.count / maxCount) * 100 : 0;
+                  
+                  return (
+                    <div key={month.month} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium capitalize">{month.month}</span>
+                        <span className="text-muted-foreground">
+                          {month.count} orçamentos • R$ {month.value.toLocaleString("pt-BR")}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="absolute left-0 top-0 h-full bg-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: `${countPercentage}%` }}
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white">
+                            Quantidade
+                          </span>
+                        </div>
+                        <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="absolute left-0 top-0 h-full bg-green-500 rounded-full transition-all duration-500"
+                            style={{ width: `${valuePercentage}%` }}
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white">
+                            Valor
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 

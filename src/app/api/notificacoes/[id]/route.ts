@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
-// PUT - Marcar notificação como lida
-export async function PUT(request: NextRequest) {
+// PATCH - Marcar notificação como lida
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const sessionData = await auth.api.getSession({ headers: request.headers });
-    
+
     if (!sessionData?.session) {
       return NextResponse.json(
         { error: "Não autorizado" },
@@ -14,44 +17,37 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const session = sessionData.session;
-    const body = await request.json();
-    const { notificationId, markAllAsRead } = body;
+    const { id } = await params;
+    const userId = sessionData.session.userId;
 
-    if (markAllAsRead) {
-      // Marcar todas como lidas
-      await prisma.notification.updateMany({
-        where: {
-          userId: session.userId,
-          read: false,
-        },
-        data: {
-          read: true,
-        },
-      });
+    // Verificar se a notificação pertence ao usuário
+    const notification = await prisma.notification.findUnique({
+      where: { id },
+    });
 
-      return NextResponse.json({ success: true, message: "Todas as notificações marcadas como lidas" });
-    }
-
-    if (!notificationId) {
+    if (!notification) {
       return NextResponse.json(
-        { error: "ID da notificação necessário" },
-        { status: 400 }
+        { error: "Notificação não encontrada" },
+        { status: 404 }
       );
     }
 
-    // Marcar notificação específica como lida
-    const notification = await prisma.notification.update({
-      where: {
-        id: notificationId,
-        userId: session.userId, // Garante que pertence ao usuário
-      },
-      data: {
-        read: true,
-      },
+    if (notification.userId !== userId) {
+      return NextResponse.json(
+        { error: "Não autorizado a modificar esta notificação" },
+        { status: 403 }
+      );
+    }
+
+    await prisma.notification.update({
+      where: { id },
+      data: { read: true },
     });
 
-    return NextResponse.json(notification);
+    return NextResponse.json({
+      success: true,
+      message: "Notificação marcada como lida",
+    });
   } catch (error) {
     console.error("Erro ao marcar notificação como lida:", error);
     return NextResponse.json(
@@ -61,11 +57,14 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Remover notificação
-export async function DELETE(request: NextRequest) {
+// DELETE - Excluir notificação
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const sessionData = await auth.api.getSession({ headers: request.headers });
-    
+
     if (!sessionData?.session) {
       return NextResponse.json(
         { error: "Não autorizado" },
@@ -73,29 +72,40 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const session = sessionData.session;
-    const { searchParams } = new URL(request.url);
-    const notificationId = searchParams.get("id");
+    const { id } = await params;
+    const userId = sessionData.session.userId;
 
-    if (!notificationId) {
+    // Verificar se a notificação pertence ao usuário
+    const notification = await prisma.notification.findUnique({
+      where: { id },
+    });
+
+    if (!notification) {
       return NextResponse.json(
-        { error: "ID da notificação necessário" },
-        { status: 400 }
+        { error: "Notificação não encontrada" },
+        { status: 404 }
+      );
+    }
+
+    if (notification.userId !== userId) {
+      return NextResponse.json(
+        { error: "Não autorizado a excluir esta notificação" },
+        { status: 403 }
       );
     }
 
     await prisma.notification.delete({
-      where: {
-        id: notificationId,
-        userId: session.userId, // Garante que pertence ao usuário
-      },
+      where: { id },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: "Notificação excluída",
+    });
   } catch (error) {
-    console.error("Erro ao remover notificação:", error);
+    console.error("Erro ao excluir notificação:", error);
     return NextResponse.json(
-      { error: "Erro ao remover notificação" },
+      { error: "Erro ao excluir notificação" },
       { status: 500 }
     );
   }

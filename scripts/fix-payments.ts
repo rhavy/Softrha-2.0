@@ -88,7 +88,7 @@ async function fixPayments() {
 
       // Buscar admin user
       const adminUser = await prisma.user.findFirst({
-        where: { role: 'admin' },
+        where: { role: 'ADMIN' },
       });
 
       // Criar projeto

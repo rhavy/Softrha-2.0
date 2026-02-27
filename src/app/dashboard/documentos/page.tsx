@@ -18,6 +18,9 @@ import {
   Upload,
   Filter,
   Edit2,
+  Eye,
+  X,
+  ExternalLink,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoDocumentoModal } from "@/components/modals/novo-documento-modal";
@@ -63,6 +66,8 @@ export default function DashboardDocumentos() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<any>(null);
   const [documentToDelete, setDocumentToDelete] = useState<any>(null);
+  const [documentToView, setDocumentToView] = useState<any>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [documentsList, setDocumentsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -104,6 +109,10 @@ export default function DashboardDocumentos() {
 
       await fetchDocuments();
       setModalOpen(false);
+      toast({
+        title: "Documento criado!",
+        description: "O documento foi criado com sucesso.",
+      });
     } catch (error) {
       console.error("Erro ao criar documento:", error);
       toast({
@@ -137,6 +146,10 @@ export default function DashboardDocumentos() {
       await fetchDocuments();
       setModalOpen(false);
       setDocumentToEdit(null);
+      toast({
+        title: "Documento atualizado!",
+        description: "O documento foi atualizado com sucesso.",
+      });
     } catch (error) {
       console.error("Erro ao atualizar documento:", error);
       toast({
@@ -168,6 +181,11 @@ export default function DashboardDocumentos() {
       await fetchDocuments();
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
+      
+      toast({
+        title: "Documento excluído!",
+        description: "O documento foi excluído com sucesso.",
+      });
     } catch (error) {
       console.error("Erro ao excluir documento:", error);
       toast({
@@ -176,6 +194,27 @@ export default function DashboardDocumentos() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleDownload = async (document: any) => {
+    if (document.url) {
+      window.open(document.url, "_blank");
+      toast({
+        title: "Abrindo documento",
+        description: "O documento será aberto em uma nova aba.",
+      });
+    } else {
+      toast({
+        title: "Download indisponível",
+        description: "Este documento não possui URL de download.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewDocument = (document: any) => {
+    setDocumentToView(document);
+    setViewDialogOpen(true);
   };
 
   const filteredDocuments = documentsList.filter((doc) => {
@@ -188,8 +227,8 @@ export default function DashboardDocumentos() {
   // Atualizar contagem de pastas
   const foldersWithCount = folders.map((folder) => ({
     ...folder,
-    count: folder.name === "Todos" 
-      ? documentsList.length 
+    count: folder.name === "Todos"
+      ? documentsList.length
       : documentsList.filter(d => d.folder === folder.name).length,
   }));
 
@@ -222,7 +261,7 @@ export default function DashboardDocumentos() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setModalOpen(true)}>
               <Upload className="h-4 w-4" />
               Upload
             </Button>
@@ -231,6 +270,64 @@ export default function DashboardDocumentos() {
               Novo Documento
             </Button>
           </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Documentos</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{documentsList.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {foldersWithCount.find(f => f.name === "Todos")?.count || 0} cadastrados
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Propostas</CardTitle>
+              <Folder className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-500">
+                {foldersWithCount.find(f => f.name === "Propostas")?.count || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Documentos de propostas
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Contratos</CardTitle>
+              <Folder className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-500">
+                {foldersWithCount.find(f => f.name === "Contratos")?.count || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Documentos contratuais
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Outros</CardTitle>
+              <Folder className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-500">
+                {documentsList.length - (foldersWithCount.find(f => f.name === "Propostas")?.count || 0) - (foldersWithCount.find(f => f.name === "Contratos")?.count || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Demais documentos
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Folders */}
@@ -318,11 +415,25 @@ export default function DashboardDocumentos() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleViewDocument(doc)}
+                      title="Visualizar"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleEditDocument(doc)}
+                      title="Editar"
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDownload(doc)}
+                      title="Download"
+                    >
                       <Download className="h-4 w-4" />
                     </Button>
                     <Button
@@ -330,6 +441,7 @@ export default function DashboardDocumentos() {
                       size="icon"
                       className="text-destructive hover:text-destructive"
                       onClick={() => handleDeleteClick(doc)}
+                      title="Excluir"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -338,7 +450,7 @@ export default function DashboardDocumentos() {
               ))}
             </div>
 
-            {filteredDocuments.length === 0 && !loading && (
+            {filteredDocuments.length === 0 && (
               <div className="text-center py-12">
                 <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">
@@ -370,13 +482,141 @@ export default function DashboardDocumentos() {
           documentToEdit={documentToEdit}
         />
 
+        {/* View Document Dialog */}
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Visualizar Documento
+              </DialogTitle>
+              <DialogDescription>
+                {documentToView?.name}
+              </DialogDescription>
+            </DialogHeader>
+
+            {documentToView && (
+              <div className="space-y-4">
+                {/* Informações do Documento */}
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold">Tipo</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className={`h-8 w-8 rounded flex items-center justify-center ${typeColors[documentToView.type]}`}>
+                        {typeIcons[documentToView.type]}
+                      </div>
+                      <span className="capitalize">{documentToView.type}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Pasta</p>
+                    <p className="mt-1">{documentToView.folder}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Tamanho</p>
+                    <p className="mt-1">{documentToView.size}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Autor</p>
+                    <p className="mt-1">{documentToView.author}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm font-semibold">Criado em</p>
+                    <p className="mt-1">{new Date(documentToView.createdAt).toLocaleString("pt-BR")}</p>
+                  </div>
+                </div>
+
+                {/* Preview/Visualização */}
+                {documentToView.url ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold">Visualização</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(documentToView.url, "_blank")}
+                      >
+                        <ExternalLink className="h-3 w-3 mr-2" />
+                        Abrir em nova aba
+                      </Button>
+                    </div>
+                    <div className="border rounded-lg overflow-hidden bg-muted/50">
+                      {documentToView.type === "image" ? (
+                        <img
+                          src={documentToView.url}
+                          alt={documentToView.name}
+                          className="w-full h-auto max-h-[400px] object-contain"
+                        />
+                      ) : documentToView.type === "pdf" ? (
+                        <iframe
+                          src={documentToView.url}
+                          className="w-full h-[500px]"
+                          title="Preview do PDF"
+                        />
+                      ) : (
+                        <div className="p-8 text-center">
+                          <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                          <p className="text-muted-foreground">
+                            Visualização não disponível para este tipo de arquivo
+                          </p>
+                          <Button
+                            className="mt-4"
+                            onClick={() => window.open(documentToView.url, "_blank")}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Baixar Arquivo
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center border rounded-lg bg-muted/50">
+                    <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-lg font-semibold">URL não disponível</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Este documento não possui uma URL de visualização cadastrada
+                    </p>
+                  </div>
+                )}
+
+                {/* Ações */}
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  {documentToView.url && (
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(documentToView.url, "_blank")}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setViewDialogOpen(false);
+                      handleEditDocument(documentToView);
+                    }}
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button onClick={() => setViewDialogOpen(false)}>
+                    Fechar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Delete Confirmation Dialog */}
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Confirmar Exclusão</DialogTitle>
               <DialogDescription>
-                Tem certeza que deseja excluir "{documentToDelete?.name}"? 
+                Tem certeza que deseja excluir "{documentToDelete?.name}"?
                 Esta ação não pode ser desfeita.
               </DialogDescription>
             </DialogHeader>

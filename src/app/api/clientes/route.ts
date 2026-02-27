@@ -1,84 +1,78 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { validateCPF, validateCNPJ, validateEmail, validateCEP } from "@/lib/validators";
-import { notifyNewClient } from "@/lib/notifications";
+import { auth } from "@/lib/auth";
+import { createLog } from "@/lib/create-log";
+import { createNotificationForAdmins } from "@/lib/create-notification";
 
 // GET - Listar todos os clientes
 export async function GET(request: NextRequest) {
   try {
+    const sessionData = await auth.api.getSession({ headers: request.headers });
+
+    if (!sessionData?.session) {
+      return NextResponse.json(
+        { error: "Não autorizado" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
     const search = searchParams.get("search");
-    const documentType = searchParams.get("documentType");
+    const status = searchParams.get("status");
 
     const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { emails: { contains: search, mode: "insensitive" } },
+        { document: { contains: search, mode: "insensitive" } },
+      ];
+    }
 
     if (status && status !== "todos") {
       where.status = status;
     }
 
-    if (documentType && documentType !== "todos") {
-      where.documentType = documentType;
-    }
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-        { document: { contains: search, mode: "insensitive" } },
-        { city: { contains: search, mode: "insensitive" } },
-        { emails: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
     const clients = await prisma.client.findMany({
       where,
+      orderBy: {
+        createdAt: "desc",
+      },
       include: {
         projects: {
           select: {
             id: true,
             name: true,
             status: true,
-            budget: true,
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
     });
 
-    // Formatar os dados para o frontend
-    const formattedClients = clients.map((client) => ({
-      id: client.id,
-      firstName: client.firstName,
-      lastName: client.lastName,
-      name: client.name,
-      documentType: client.documentType,
-      document: client.document,
-      emails: client.emails ? JSON.parse(client.emails) : [],
-      phones: client.phones ? JSON.parse(client.phones) : [],
-      address: client.address,
-      number: client.number,
-      complement: client.complement,
-      neighborhood: client.neighborhood,
-      city: client.city,
-      state: client.state,
-      zipCode: client.zipCode,
-      status: client.status,
-      notes: client.notes,
-      projectsCount: client.projects.length,
-      projects: client.projects,
-      createdAt: client.createdAt,
-      updatedAt: client.updatedAt,
-    }));
+    // Criar log de visualização
+    await createLog({
+      type: "VIEW",
+      category: "CLIENT",
+      level: "INFO",
+      userId: sessionData.session.userId,
+      action: "Listar clientes",
+      description: `Usuário visualizou a lista de clientes${search ? ` (busca: ${search})` : ""}`,
+      metadata: { filters: { search, status }, totalClients: clients.length },
+    });
 
-    return NextResponse.json(formattedClients);
+    return NextResponse.json(clients);
   } catch (error) {
     console.error("Erro ao buscar clientes:", error);
+    await createLog({
+      type: "SYSTEM",
+      category: "CLIENT",
+      level: "ERROR",
+      action: "Erro ao listar clientes",
+      description: `Erro: ${error instanceof Error ? error.message : String(error)}`,
+    });
     return NextResponse.json(
-      { error: "Erro ao buscar clientes: " + (error as any).message },
+      { error: "Erro ao buscar clientes" },
       { status: 500 }
     );
   }
@@ -87,126 +81,236 @@ export async function GET(request: NextRequest) {
 // POST - Criar novo cliente
 export async function POST(request: NextRequest) {
   try {
+    const sessionData = await auth.api.getSession({ headers: request.headers });
+
+    if (!sessionData?.session) {
+      return NextResponse.json(
+        { error: "Não autorizado" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
-    const {
-      firstName,
-      lastName,
-      documentType,
-      document,
-      emails,
-      phones,
-      address,
-      number,
-      complement,
-      neighborhood,
-      city,
-      state,
-      zipCode,
-      status,
-      notes,
-    } = body;
+    const userId = sessionData.session.userId;
 
-    console.log("Dados recebidos:", body);
-
-    // Validações
-    if (!firstName || !lastName) {
-      return NextResponse.json(
-        { error: "Nome e sobrenome são obrigatórios" },
-        { status: 400 }
-      );
-    }
-
-    if (!documentType || !document) {
-      return NextResponse.json(
-        { error: "Tipo de documento e documento são obrigatórios" },
-        { status: 400 }
-      );
-    }
-
-    // Validar documento
-    const cleanDocument = document.replace(/\D/g, "");
-    if (documentType === "cpf" && !validateCPF(cleanDocument)) {
-      return NextResponse.json(
-        { error: "CPF inválido" },
-        { status: 400 }
-      );
-    }
-    if (documentType === "cnpj" && !validateCNPJ(cleanDocument)) {
-      return NextResponse.json(
-        { error: "CNPJ inválido" },
-        { status: 400 }
-      );
-    }
-
-    // Validar CEP
-    if (zipCode && !validateCEP(zipCode.replace(/\D/g, ""))) {
-      return NextResponse.json(
-        { error: "CEP inválido" },
-        { status: 400 }
-      );
-    }
-
-    // Validar emails
-    if (emails && emails.length > 0) {
-      for (const email of emails) {
-        if (!validateEmail(email.value)) {
-          return NextResponse.json(
-            { error: `Email inválido: ${email.value}` },
-            { status: 400 }
-          );
-        }
-      }
-    }
-
-    // Criar cliente
     const client = await prisma.client.create({
       data: {
-        firstName,
-        lastName,
-        name: `${firstName} ${lastName}`,
-        documentType,
-        document: cleanDocument,
-        emails: emails && emails.length > 0 ? JSON.stringify(emails) : null,
-        phones: phones && phones.length > 0 ? JSON.stringify(phones) : null,
-        address: address || null,
-        number: number || null,
-        complement: complement || null,
-        neighborhood: neighborhood || null,
-        city: city || null,
-        state: state || null,
-        zipCode: zipCode?.replace(/\D/g, "") || null,
-        status: status || "active",
-        notes: notes || null,
+        ...body,
       },
     });
 
-    // Enviar notificação para todos os admins
-    await notifyNewClient(client.id, client.name);
-
-    return NextResponse.json({
-      id: client.id,
-      firstName: client.firstName,
-      lastName: client.lastName,
-      name: client.name,
-      documentType: client.documentType,
-      document: client.document,
-      emails: client.emails ? JSON.parse(client.emails) : [],
-      phones: client.phones ? JSON.parse(client.phones) : [],
-      status: client.status,
+    // Criar log de criação
+    await createLog({
+      type: "CREATE",
+      category: "CLIENT",
+      level: "SUCCESS",
+      userId,
+      entityId: client.id,
+      entityType: "Client",
+      action: "Cliente criado",
+      description: `Novo cliente "${client.name}" cadastrado no sistema`,
+      metadata: {
+        clientId: client.id,
+        clientName: client.name,
+        document: client.document,
+        emails: client.emails,
+        phones: client.phones,
+      },
+      changes: { before: null, after: client },
     });
+
+    // Criar notificação para admins
+    await createNotificationForAdmins({
+      title: "Novo Cliente Cadastrado! 👤",
+      message: `O cliente "${client.name}" foi cadastrado no sistema.`,
+      type: "success",
+      category: "client",
+      link: `/dashboard/clientes/${client.id}`,
+      metadata: {
+        clientId: client.id,
+        clientName: client.name,
+      },
+    });
+
+    return NextResponse.json(client, { status: 201 });
   } catch (error) {
     console.error("Erro ao criar cliente:", error);
-    
-    // Verificar se é erro de documento único
-    if ((error as any).code === "P2002") {
+    await createLog({
+      type: "SYSTEM",
+      category: "CLIENT",
+      level: "ERROR",
+      action: "Erro ao criar cliente",
+      description: `Erro: ${error instanceof Error ? error.message : String(error)}`,
+    });
+    return NextResponse.json(
+      { error: "Erro ao criar cliente" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Atualizar cliente
+export async function PUT(request: NextRequest) {
+  try {
+    const sessionData = await auth.api.getSession({ headers: request.headers });
+
+    if (!sessionData?.session) {
       return NextResponse.json(
-        { error: "Já existe um cliente com este documento cadastrado" },
+        { error: "Não autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { id, ...updateData } = body;
+    const userId = sessionData.session.userId;
+
+    // Buscar cliente atual para log
+    const existingClient = await prisma.client.findUnique({
+      where: { id },
+    });
+
+    if (!existingClient) {
+      return NextResponse.json(
+        { error: "Cliente não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const client = await prisma.client.update({
+      where: { id },
+      data: updateData,
+    });
+
+    // Criar log de atualização
+    await createLog({
+      type: "UPDATE",
+      category: "CLIENT",
+      level: "INFO",
+      userId,
+      entityId: client.id,
+      entityType: "Client",
+      action: "Cliente atualizado",
+      description: `Dados do cliente "${client.name}" atualizados`,
+      metadata: {
+        clientId: client.id,
+        clientName: client.name,
+        updatedFields: Object.keys(updateData),
+      },
+      changes: {
+        before: existingClient,
+        after: client,
+      },
+    });
+
+    return NextResponse.json(client);
+  } catch (error) {
+    console.error("Erro ao atualizar cliente:", error);
+    await createLog({
+      type: "SYSTEM",
+      category: "CLIENT",
+      level: "ERROR",
+      action: "Erro ao atualizar cliente",
+      description: `Erro: ${error instanceof Error ? error.message : String(error)}`,
+    });
+    return NextResponse.json(
+      { error: "Erro ao atualizar cliente" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Excluir cliente
+export async function DELETE(request: NextRequest) {
+  try {
+    const sessionData = await auth.api.getSession({ headers: request.headers });
+
+    if (!sessionData?.session) {
+      return NextResponse.json(
+        { error: "Não autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { id } = body;
+    const userId = sessionData.session.userId;
+
+    // Buscar cliente para log
+    const existingClient = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        projects: true,
+      },
+    });
+
+    if (!existingClient) {
+      return NextResponse.json(
+        { error: "Cliente não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // Verificar se tem projetos vinculados
+    if (existingClient.projects.length > 0) {
+      return NextResponse.json(
+        { error: "Não é possível excluir cliente com projetos vinculados", projects: existingClient.projects },
         { status: 400 }
       );
     }
 
+    // Excluir cliente
+    await prisma.client.delete({
+      where: { id },
+    });
+
+    // Criar log de exclusão
+    await createLog({
+      type: "DELETE",
+      category: "CLIENT",
+      level: "WARNING",
+      userId,
+      entityId: id,
+      entityType: "Client",
+      action: "Cliente excluído",
+      description: `Cliente "${existingClient.name}" foi excluído`,
+      metadata: {
+        clientId: id,
+        clientName: existingClient.name,
+        document: existingClient.document,
+        deletedBy: userId,
+      },
+      changes: { before: existingClient, after: null },
+    });
+
+    // Criar notificação para admins
+    await createNotificationForAdmins({
+      title: "Cliente Excluído 🗑️",
+      message: `O cliente "${existingClient.name}" foi excluído do sistema.`,
+      type: "warning",
+      category: "client",
+      metadata: {
+        clientId: id,
+        clientName: existingClient.name,
+        deletedAt: new Date().toISOString(),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Cliente excluído com sucesso",
+    });
+  } catch (error) {
+    console.error("Erro ao excluir cliente:", error);
+    await createLog({
+      type: "SYSTEM",
+      category: "CLIENT",
+      level: "ERROR",
+      action: "Erro ao excluir cliente",
+      description: `Erro: ${error instanceof Error ? error.message : String(error)}`,
+    });
     return NextResponse.json(
-      { error: "Erro ao criar cliente: " + (error as any).message },
+      { error: "Erro ao excluir cliente" },
       { status: 500 }
     );
   }
