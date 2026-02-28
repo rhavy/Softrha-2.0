@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         email: true,
         emailVerified: true,
         role: true,
+        teamRole: true,
         avatar: true,
         createdAt: true,
       },

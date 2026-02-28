@@ -16,6 +16,7 @@ import {
   Check,
   Trash2,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,6 +24,14 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useSession } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface DashboardHeaderProps {
   onMenuToggle?: () => void;
@@ -49,6 +58,8 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, refresh } = useNotifications();
   const { data: session } = useSession();
 
@@ -86,6 +97,19 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
     }
     setNotificationsOpen(false);
   };
+
+  const handleDeleteClick = (notificationId: string) => {
+    setNotificationToDelete(notificationId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (notificationToDelete) {
+      await deleteNotification(notificationToDelete);
+      setDeleteConfirmOpen(false);
+      setNotificationToDelete(null);
+    }
+  };
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center gap-4 px-4 md:px-6">
@@ -100,9 +124,7 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary group-hover:bg-primary/90 transition-colors">
-            <span className="text-lg font-bold text-primary-foreground">S</span>
-          </div>
+          <img src="/logo.png" alt="SoftRha" className="h-8 w-auto" />
           <span className="font-bold hidden sm:inline-block">SoftRha</span>
         </Link>
 
@@ -227,7 +249,7 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          deleteNotification(notification.id);
+                                          handleDeleteClick(notification.id);
                                         }}
                                         className="text-muted-foreground hover:text-destructive transition-colors"
                                       >
@@ -347,6 +369,39 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
           </div>
         </div>
       </div>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Confirmar Exclusão
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir esta notificação? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setNotificationToDelete(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }

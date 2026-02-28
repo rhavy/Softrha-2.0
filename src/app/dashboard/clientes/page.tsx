@@ -24,6 +24,8 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRealTimeUpdates } from "@/hooks/use-real-time-updates";
+import { useRouter } from "next/navigation";
+import { hasToastBeenShown, markToastAsShown } from "@/lib/toast-dedup";
 import { NovoClienteModal } from "@/components/modals/novo-cliente-modal";
 import {
   Dialog,
@@ -33,10 +35,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Link from "next/link";
 import { formatCNPJ, formatCPF } from "@/lib/validators";
 
 export default function DashboardClientes() {
+  const router = useRouter();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
@@ -44,8 +54,42 @@ export default function DashboardClientes() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<any>(null);
   const [clientToDelete, setClientToDelete] = useState<any>(null);
+  const [deletionReason, setDeletionReason] = useState("");
+  const [deletionType, setDeletionType] = useState("");
   const [clientsList, setClientsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    fetchCurrentUser();
+    fetchClients();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUser(data);
+        
+        // Verificar se é ADMIN
+        if (data.role !== "ADMIN") {
+          const toastId = "clientes-access-denied";
+          if (!hasToastBeenShown(toastId)) {
+            markToastAsShown(toastId);
+            toast({
+              title: "Acesso Restrito",
+              description: "Esta página é exclusiva para administradores",
+              variant: "destructive",
+            });
+            setTimeout(() => router.push("/dashboard"), 2000);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuário atual:", error);
+    }
+  };
 
   // Hook de atualizações em tempo real
   const { refresh, hasUpdates } = useRealTimeUpdates("clientes", {
@@ -82,10 +126,15 @@ export default function DashboardClientes() {
 
   const handleNewClient = async (data: any) => {
     try {
+      // Enviar arrays diretamente (a API faz a conversão para string JSON)
+      const payload = {
+        ...data,
+      };
+
       const response = await fetch("/api/clientes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       const responseData = await response.json();
       if (!response.ok) throw new Error(responseData.error || "Erro ao criar cliente");
@@ -110,10 +159,16 @@ export default function DashboardClientes() {
   const handleUpdateClient = async (data: any) => {
     if (!clientToEdit?.id) return;
     try {
+      // Enviar arrays diretamente (a API faz a conversão para string JSON)
+      const payload = {
+        ...data,
+        id: clientToEdit.id,
+      };
+
       const response = await fetch(`/api/clientes/${clientToEdit.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       const responseData = await response.json();
       if (!response.ok) throw new Error(responseData.error || "Erro ao atualizar");
@@ -138,21 +193,30 @@ export default function DashboardClientes() {
 
   const handleDeleteClient = async () => {
     if (!clientToDelete?.id) return;
+    if (!deletionType) return;
+    
     try {
       const response = await fetch(`/api/clientes/${clientToDelete.id}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: clientToDelete.id,
+          reason: `${deletionType}${deletionReason ? ` - ${deletionReason}` : ""}`,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
 
       toast({
         title: "Cliente excluído!",
-        description: "O cliente foi excluído com sucesso.",
+        description: "O cliente foi marcado como excluído.",
         variant: "success",
       });
 
       await fetchClients();
       setDeleteDialogOpen(false);
+      setDeletionReason("");
+      setDeletionType("");
     } catch (error) {
       toast({
         title: "Erro ao excluir",
@@ -176,7 +240,7 @@ export default function DashboardClientes() {
     inactive: clientsList.filter(c => c.status === "inactive").length,
   };
 
-  if (loading) {
+  if (loading || (currentUser && currentUser.role !== "ADMIN")) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
@@ -343,7 +407,10 @@ export default function DashboardClientes() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setClientToEdit(client)}
+                      onClick={() => {
+                        setClientToEdit(client);
+                        setModalOpen(true);
+                      }}
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
@@ -351,7 +418,10 @@ export default function DashboardClientes() {
                       variant="ghost"
                       size="icon"
                       className="text-destructive"
-                      onClick={() => setClientToDelete(client)}
+                      onClick={() => {
+                        setClientToDelete(client);
+                        setDeleteDialogOpen(true);
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -390,14 +460,66 @@ export default function DashboardClientes() {
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Confirmar Exclusão</DialogTitle>
-              <DialogDescription>
-                Tem certeza que deseja excluir "{clientToDelete?.name}"?
+              <DialogTitle>Confirmar Exclusão de Cliente</DialogTitle>
+              <DialogDescription className="flex flex-col gap-2 text-left">
+                <span>
+                  Tem certeza que deseja excluir <strong>"{clientToDelete?.name}"</strong>?
+                </span>
+                <span className="text-amber-600 font-medium">
+                  ⚠️ Esta ação é um soft delete - o cliente ficará oculto para usuários não ADMIN.
+                </span>
               </DialogDescription>
             </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Motivo da Exclusão <span className="text-red-500">*</span>
+                </label>
+                <Select value={deletionType} onValueChange={setDeletionType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o motivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cliente-solicitou">Cliente solicitou a exclusão</SelectItem>
+                    <SelectItem value="projeto-cancelado">Projeto cancelado</SelectItem>
+                    <SelectItem value="dados-incorretos">Dados incorretos/cadastrados por engano</SelectItem>
+                    <SelectItem value="cliente-inativo">Cliente inativo há muito tempo</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descrição Adicional (opcional)</label>
+                <textarea
+                  className="w-full min-h-[100px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Informe mais detalhes sobre o motivo da exclusão..."
+                  value={deletionReason}
+                  onChange={(e) => setDeletionReason(e.target.value)}
+                />
+              </div>
+            </div>
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
-              <Button variant="destructive" onClick={handleDeleteClient}>Excluir</Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDeletionReason("");
+                  setDeletionType("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteClient}
+                disabled={!deletionType}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Cliente
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

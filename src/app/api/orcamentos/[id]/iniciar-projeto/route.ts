@@ -1,16 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionData = await auth.api.getSession({ headers: request.headers });
+    
+    if (!sessionData?.session) {
+      return NextResponse.json(
+        { error: "Não autorizado" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
+    const userId = sessionData.session.userId;
 
     // Buscar orçamento
     const budget = await prisma.budget.findUnique({
       where: { id },
+      include: {
+        acceptedByUser: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!budget) {
@@ -91,10 +110,8 @@ export async function POST(
       flexivel: "flexible",
     };
 
-    // Buscar primeiro usuário admin para usar como criador
-    const adminUser = await prisma.user.findFirst({
-      where: { role: "ADMIN" },
-    });
+    // Usar o usuário que aceitou o orçamento como criador do projeto
+    const createdById = budget.acceptedBy || userId;
 
     // Criar projeto aguardando pagamento
     const project = await prisma.project.create({
@@ -108,7 +125,7 @@ export async function POST(
         budget: projectValue,
         clientId: client.id,
         clientName: budget.clientName,
-        createdById: adminUser?.id,
+        createdById: createdById,
         progress: 0,
       },
     });

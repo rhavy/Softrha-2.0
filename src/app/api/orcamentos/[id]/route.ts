@@ -41,6 +41,13 @@ export async function GET(
           },
         },
         payments: true,
+        acceptedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 

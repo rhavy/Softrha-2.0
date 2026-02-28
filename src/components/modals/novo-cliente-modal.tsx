@@ -130,13 +130,40 @@ export function NovoClienteModal({
   // Carregar dados do cliente quando estiver editando
   useEffect(() => {
     if (clientToEdit && open) {
+      // Parse dos campos JSON (emails e phones são strings JSON no banco)
+      const parsedEmails = typeof clientToEdit.emails === "string" 
+        ? JSON.parse(clientToEdit.emails || "[]")
+        : Array.isArray(clientToEdit.emails) 
+          ? clientToEdit.emails 
+          : [];
+      
+      const parsedPhones = typeof clientToEdit.phones === "string"
+        ? JSON.parse(clientToEdit.phones || "[]")
+        : Array.isArray(clientToEdit.phones)
+          ? clientToEdit.phones
+          : [];
+
       form.reset({
-        firstName: clientToEdit.firstName,
-        lastName: clientToEdit.lastName,
-        documentType: clientToEdit.documentType as "cpf" | "cnpj",
-        document: clientToEdit.document,
-        emails: clientToEdit.emails?.length > 0 ? clientToEdit.emails : [{ id: "1", value: "", type: "trabalho", isPrimary: true }],
-        phones: clientToEdit.phones?.length > 0 ? clientToEdit.phones : [{ id: "1", value: "", type: "whatsapp", isPrimary: true }],
+        firstName: clientToEdit.firstName || "",
+        lastName: clientToEdit.lastName || "",
+        documentType: (clientToEdit.documentType as "cpf" | "cnpj") || "cpf",
+        document: clientToEdit.document || "",
+        emails: parsedEmails && parsedEmails.length > 0
+          ? parsedEmails.map((e: any) => ({
+              id: e.id || "",
+              value: e.value || "",
+              type: e.type || "trabalho",
+              isPrimary: e.isPrimary || false,
+            }))
+          : [{ id: "1", value: "", type: "trabalho", isPrimary: true }],
+        phones: parsedPhones && parsedPhones.length > 0
+          ? parsedPhones.map((p: any) => ({
+              id: p.id || "",
+              value: p.value || "",
+              type: p.type || "whatsapp",
+              isPrimary: p.isPrimary || false,
+            }))
+          : [{ id: "1", value: "", type: "whatsapp", isPrimary: true }],
         zipCode: clientToEdit.zipCode || "",
         address: clientToEdit.address || "",
         number: clientToEdit.number || "",
@@ -144,7 +171,7 @@ export function NovoClienteModal({
         neighborhood: clientToEdit.neighborhood || "",
         city: clientToEdit.city || "",
         state: clientToEdit.state || "",
-        status: clientToEdit.status as "active" | "inactive",
+        status: (clientToEdit.status as "active" | "inactive") || "active",
         notes: clientToEdit.notes || "",
       });
     } else if (!clientToEdit && open) {
@@ -372,7 +399,13 @@ export function NovoClienteModal({
                       <FormField
                         control={form.control}
                         name={`emails.${index}.value`}
-                        rules={{ required: "Email é obrigatório" }}
+                        rules={{ 
+                          required: "Email é obrigatório",
+                          pattern: {
+                            value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                            message: "Email inválido"
+                          }
+                        }}
                         render={({ field }) => (
                           <FormItem className="flex-1">
                             <FormControl>
@@ -382,6 +415,7 @@ export function NovoClienteModal({
                                 {...field}
                               />
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
@@ -438,7 +472,13 @@ export function NovoClienteModal({
                       <FormField
                         control={form.control}
                         name={`phones.${index}.value`}
-                        rules={{ required: "Telefone é obrigatório" }}
+                        rules={{ 
+                          required: "Telefone é obrigatório",
+                          pattern: {
+                            value: /^\(\d{2}\) \d{4,5}-\d{4}$/,
+                            message: "Formato inválido. Use (00) 00000-0000"
+                          }
+                        }}
                         render={({ field }) => (
                           <FormItem className="flex-1">
                             <FormControl>
@@ -451,6 +491,7 @@ export function NovoClienteModal({
                                 }}
                               />
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />

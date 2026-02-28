@@ -116,9 +116,7 @@ export default function Login() {
           <Card>
             <CardHeader className="space-y-1">
               <div className="flex items-center gap-2 mb-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                  <span className="text-lg font-bold text-primary-foreground">S</span>
-                </div>
+                <img src="/logo.png" alt="SoftRha" className="h-8 w-auto" />
                 <span className="text-xl font-bold">SoftRha</span>
               </div>
               <CardTitle className="text-2xl">Bem-vindo de volta</CardTitle>

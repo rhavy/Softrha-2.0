@@ -16,11 +16,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: sessionData.session.userId },
+      select: { role: true },
+    });
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
     const status = searchParams.get("status");
+    const includeDeleted = searchParams.get("includeDeleted") === "true";
 
     const where: any = {};
+
+    // Se não for ADMIN, não mostrar clientes excluídos
+    if (user?.role !== "ADMIN" && !includeDeleted) {
+      where.status = { not: "deleted" };
+    } else if (status && status !== "todos") {
+      where.status = status;
+    }
 
     if (search) {
       where.OR = [
@@ -28,10 +41,6 @@ export async function GET(request: NextRequest) {
         { emails: { contains: search, mode: "insensitive" } },
         { document: { contains: search, mode: "insensitive" } },
       ];
-    }
-
-    if (status && status !== "todos") {
-      where.status = status;
     }
 
     const clients = await prisma.client.findMany({
@@ -58,10 +67,18 @@ export async function GET(request: NextRequest) {
       userId: sessionData.session.userId,
       action: "Listar clientes",
       description: `Usuário visualizou a lista de clientes${search ? ` (busca: ${search})` : ""}`,
-      metadata: { filters: { search, status }, totalClients: clients.length },
+      metadata: { filters: { search, status, includeDeleted }, totalClients: clients.length, userRole: user?.role },
     });
 
-    return NextResponse.json(clients);
+    // Parse dos campos JSON
+    const parsedClients = clients.map((client) => ({
+      ...client,
+      emails: client.emails ? JSON.parse(client.emails) : [],
+      phones: client.phones ? JSON.parse(client.phones) : [],
+      projectsCount: client.projects.length,
+    }));
+
+    return NextResponse.json(parsedClients);
   } catch (error) {
     console.error("Erro ao buscar clientes:", error);
     await createLog({
@@ -93,9 +110,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const userId = sessionData.session.userId;
 
+    // Converter arrays para string JSON
+    const dataToSave = {
+      ...body,
+      emails: body.emails ? JSON.stringify(body.emails) : null,
+      phones: body.phones ? JSON.stringify(body.phones) : null,
+    };
+
     const client = await prisma.client.create({
       data: {
-        ...body,
+        ...dataToSave,
       },
     });
 
@@ -220,7 +244,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Excluir cliente
+// DELETE - Soft delete (mudar status para 'deleted')
 export async function DELETE(request: NextRequest) {
   try {
     const sessionData = await auth.api.getSession({ headers: request.headers });
@@ -233,7 +257,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id } = body;
+    const { id, reason } = body; // Motivo da exclusão
     const userId = sessionData.session.userId;
 
     // Buscar cliente para log
@@ -259,9 +283,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Excluir cliente
-    await prisma.client.delete({
+    // Soft delete - apenas mudar status e adicionar dados de exclusão
+    await prisma.client.update({
       where: { id },
+      data: {
+        status: "deleted",
+        deletedAt: new Date(),
+        deletedBy: userId,
+        deletionReason: reason || null,
+      },
     });
 
     // Criar log de exclusão
@@ -272,15 +302,20 @@ export async function DELETE(request: NextRequest) {
       userId,
       entityId: id,
       entityType: "Client",
-      action: "Cliente excluído",
-      description: `Cliente "${existingClient.name}" foi excluído`,
+      action: "Cliente excluído (soft delete)",
+      description: `Cliente "${existingClient.name}" foi marcado como excluído. Motivo: ${reason || "Não informado"}`,
       metadata: {
         clientId: id,
         clientName: existingClient.name,
         document: existingClient.document,
         deletedBy: userId,
+        reason: reason || "Não informado",
+        deletedAt: new Date().toISOString(),
       },
-      changes: { before: existingClient, after: null },
+      changes: { 
+        before: { status: existingClient.status }, 
+        after: { status: "deleted", deletedAt: new Date().toISOString() },
+      },
     });
 
     // Criar notificação para admins

@@ -11,9 +11,7 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-lg font-bold text-primary-foreground">S</span>
-              </div>
+              <img src="/logo.png" alt="SoftRha" className="h-8 w-auto" />
               <span className="text-xl font-bold text-foreground">SoftRha</span>
             </div>
             <p className="text-sm text-muted-foreground">

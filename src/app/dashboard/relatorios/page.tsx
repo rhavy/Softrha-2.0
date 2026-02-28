@@ -23,6 +23,7 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { hasToastBeenShown, markToastAsShown } from "@/lib/toast-dedup";
 
 interface Budget {
   id: string;
@@ -48,6 +49,7 @@ interface Stats {
   rejected: number;
   userApproved: number;
   contractSigned: number;
+  downPaymentSent: number;
   downPaymentPaid: number;
   finalPaymentPaid: number;
   completed: number;
@@ -61,6 +63,11 @@ interface Stats {
   byComplexity: Record<string, number>;
   byTimeline: Record<string, number>;
   monthlyEvolution: { month: string; count: number; value: number }[];
+  // Métricas de Pagamento de Entrada (25%)
+  downPaymentTotal: number;
+  downPaymentPending: number;
+  downPaymentReceived: number;
+  downPaymentRate: number;
 }
 
 const statusColors: Record<string, string> = {
@@ -100,38 +107,93 @@ export default function RelatoriosPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<"7d" | "30d" | "90d" | "all">("30d");
+  const [downPaymentValue, setDownPaymentValue] = useState(0);
+  const [downPaymentPendingValue, setDownPaymentPendingValue] = useState(0);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchBudgets();
   }, [period]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUser(data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuário atual:", error);
+    }
+  };
+
+  // Função para mascarar email
+  const maskEmail = (email: string) => {
+    if (!email) return "";
+    const [username, domain] = email.split("@");
+    if (username.length <= 2) return email;
+    const maskedUsername = username.charAt(0) + "*".repeat(username.length - 2) + username.charAt(username.length - 1);
+    return `${maskedUsername}@${domain}`;
+  };
+
+  // Função para mascarar telefone
+  const maskPhone = (phone: string) => {
+    if (!phone) return "";
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) return phone;
+    
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 8)}**`;
+    } else {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 9)}**`;
+    }
+  };
 
   const fetchBudgets = async () => {
     try {
       const response = await fetch("/api/orcamentos");
       if (!response.ok) throw new Error("Erro ao buscar orçamentos");
       const data = await response.json();
-      
+
       // Filtrar por período
       const now = new Date();
       const filteredData = data.filter((budget: Budget) => {
         const budgetDate = new Date(budget.createdAt);
         const diffTime = now.getTime() - budgetDate.getTime();
         const diffDays = diffTime / (1000 * 3600 * 24);
-        
+
         if (period === "7d") return diffDays <= 7;
         if (period === "30d") return diffDays <= 30;
         if (period === "90d") return diffDays <= 90;
         return true;
       });
-      
+
       setBudgets(filteredData);
       calculateStats(filteredData);
+      
+      // Verificar se há orçamentos aceitos pelo usuário atual
+      const acceptedByUser = filteredData.filter((b: any) => b.acceptedBy === currentUser?.id);
+      if (acceptedByUser.length > 0) {
+        const toastId = `reports-loaded-${currentUser.id}`;
+        if (!hasToastBeenShown(toastId)) {
+          markToastAsShown(toastId);
+          toast({
+            title: "Relatórios atualizados",
+            description: `${acceptedByUser.length} orçamento(s) aceito(s) por você`,
+          });
+        }
+      }
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os relatórios",
-        variant: "destructive",
-      });
+      const toastId = "reports-error";
+      if (!hasToastBeenShown(toastId)) {
+        markToastAsShown(toastId);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os relatórios",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +210,10 @@ export default function RelatoriosPage() {
     const downPaymentPaid = data.filter((b) => b.status === "down_payment_paid").length;
     const finalPaymentPaid = data.filter((b) => b.status === "final_payment_paid").length;
     const completed = data.filter((b) => b.status === "completed").length;
+
+    // Variáveis de valor de pagamento de entrada
+    let downPaymentValue = 0;
+    let downPaymentPendingValue = 0;
 
     // Taxa de conversão = Aceitos / (Aceitos + Rejeitados)
     const convertedOrLost = accepted + rejected;
@@ -180,6 +246,25 @@ export default function RelatoriosPage() {
     // Valor potencial (pendentes)
     const pendingBudgets = data.filter((b) => b.status === "pending");
     const potentialValue = pendingBudgets.reduce((sum, b) => sum + (b.estimatedMax), 0);
+
+    // Métricas de Pagamento de Entrada (25%)
+    const downPaymentSent = data.filter((b) => b.status === "down_payment_sent").length;
+    const downPaymentTotal = downPaymentSent + downPaymentPaid;
+    const downPaymentPending = downPaymentSent; // Aguardando pagamento
+    const downPaymentReceived = downPaymentPaid; // Já pagos
+    const downPaymentRate = downPaymentTotal > 0
+      ? (downPaymentPaid / downPaymentTotal) * 100
+      : 0;
+
+    // Calcular valor total das entradas pagas (25% do valor final)
+    downPaymentValue = data
+      .filter((b) => b.status === "down_payment_paid")
+      .reduce((sum, b) => sum + ((b.finalValue || b.estimatedMax) * 0.25), 0);
+
+    // Calcular valor pendente das entradas não pagas (25% do valor final)
+    downPaymentPendingValue = data
+      .filter((b) => b.status === "down_payment_sent")
+      .reduce((sum, b) => sum + ((b.finalValue || b.estimatedMax) * 0.25), 0);
 
     // Distribuição por tipo de projeto
     const byProjectType: Record<string, number> = {};
@@ -231,6 +316,7 @@ export default function RelatoriosPage() {
       rejected,
       userApproved,
       contractSigned,
+      downPaymentSent,
       downPaymentPaid,
       finalPaymentPaid,
       completed,
@@ -244,7 +330,15 @@ export default function RelatoriosPage() {
       byComplexity,
       byTimeline,
       monthlyEvolution,
+      downPaymentTotal,
+      downPaymentPending,
+      downPaymentReceived,
+      downPaymentRate,
     });
+    
+    // Definir valores de pagamento de entrada
+    setDownPaymentValue(downPaymentValue);
+    setDownPaymentPendingValue(downPaymentPendingValue);
   };
 
   const exportToCSV = () => {
@@ -252,7 +346,7 @@ export default function RelatoriosPage() {
     const rows = budgets.map((b) => [
       b.id,
       b.clientName,
-      b.clientEmail,
+      maskEmail(b.clientEmail),
       b.company || "",
       b.projectType,
       statusLabels[b.status],
@@ -260,7 +354,7 @@ export default function RelatoriosPage() {
       b.estimatedMax,
       new Date(b.createdAt).toLocaleDateString("pt-BR"),
     ]);
-    
+
     const csv = [headers, ...rows].map((row) => row.join(";")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -268,11 +362,15 @@ export default function RelatoriosPage() {
     link.href = url;
     link.download = `relatorio-orcamentos-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
-    
-    toast({
-      title: "Exportado!",
-      description: "Relatório exportado em CSV com sucesso.",
-    });
+
+    const toastId = "csv-exported";
+    if (!hasToastBeenShown(toastId)) {
+      markToastAsShown(toastId);
+      toast({
+        title: "Exportado!",
+        description: "Relatório exportado em CSV com sucesso.",
+      });
+    }
   };
 
   if (isLoading || !stats) {
@@ -301,15 +399,18 @@ export default function RelatoriosPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToCSV}
-              disabled={budgets.length === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar CSV
-            </Button>
+            {/* Botão Exportar CSV - Apenas para ADMIN */}
+            {currentUser?.role === "ADMIN" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToCSV}
+                disabled={budgets.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={fetchBudgets}>
               <RefreshCcw className="h-4 w-4 mr-2" />
               Atualizar
@@ -435,6 +536,109 @@ export default function RelatoriosPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Métricas de Pagamento de Entrada (25%) */}
+        <Card className="mb-8 border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-teal-50/50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-emerald-700">
+                  <DollarSign className="h-5 w-5" />
+                  Pagamentos de Entrada (25%)
+                </CardTitle>
+                <CardDescription className="text-emerald-600">
+                  Acompanhe os pagamentos de entrada dos orçamentos aprovados
+                </CardDescription>
+              </div>
+              <Badge className="bg-emerald-600 text-white">
+                {stats.downPaymentRate.toFixed(1)}% recebidos
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Card className="border-0 shadow-sm bg-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs font-medium text-muted-foreground">Total de Entradas</CardTitle>
+                  <FileText className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg font-bold text-emerald-700">{stats.downPaymentTotal}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats.downPaymentPending} pendentes
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm bg-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs font-medium text-muted-foreground">Entradas Pagas</CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg font-bold text-green-700">{stats.downPaymentReceived}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Recebidos com sucesso
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm bg-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs font-medium text-muted-foreground">Valor Recebido (25%)</CardTitle>
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg font-bold text-green-700">
+                    R$ {downPaymentValue.toLocaleString("pt-BR")}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Valor total recebido
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm bg-white">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs font-medium text-muted-foreground">Valor Pendente (25%)</CardTitle>
+                  <Clock className="h-4 w-4 text-amber-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg font-bold text-amber-700">
+                    R$ {downPaymentPendingValue.toLocaleString("pt-BR")}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Aguardando pagamento
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Barra de Progresso */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-emerald-700">Taxa de Recebimento</span>
+                <span className="text-sm font-medium text-emerald-700">{stats.downPaymentRate.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-emerald-200 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 h-3 rounded-full transition-all duration-500"
+                  style={{ width: `${stats.downPaymentRate}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-green-600" />
+                  {stats.downPaymentReceived} recebidos
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-amber-600" />
+                  {stats.downPaymentPending} pendentes
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Status Breakdown */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">

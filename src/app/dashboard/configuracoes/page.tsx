@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
 import {
   Settings,
@@ -29,10 +30,22 @@ import {
   EyeOff,
   Check,
   Loader2,
+  Plus,
+  X,
+  Camera,
+  DollarSign,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { useSession } from "@/hooks/use-auth";
+import { useRouter } from "next/navigation";
+
+interface ContactField {
+  id: string;
+  value: string;
+  type: string;
+  isPrimary: boolean;
+}
 
 interface NotificationPreferences {
   emailEnabled: boolean;
@@ -44,6 +57,8 @@ interface NotificationPreferences {
 }
 
 export default function DashboardConfiguracoes() {
+  const router = useRouter();
+  const { data: session, isPending: isLoadingSession } = useSession();
   const [activeTab, setActiveTab] = useState<"perfil" | "notificacoes" | "privacidade" | "aparicao">("perfil");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -56,12 +71,31 @@ export default function DashboardConfiguracoes() {
     clientAlerts: true,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  
+  // Perfil
+  const [nome, setNome] = useState("");
+  const [emails, setEmails] = useState<ContactField[]>([{ id: "1", value: "", type: "pessoal", isPrimary: true }]);
+  const [telefones, setTelefones] = useState<ContactField[]>([{ id: "1", value: "", type: "whatsapp", isPrimary: true }]);
+  const [bio, setBio] = useState("");
+  
+  // Senha
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+
   const { toast } = useToast();
-  const { isSupported, permission, subscribeToPush, unsubscribeFromPush } = usePushNotifications();
 
   useEffect(() => {
-    fetchPreferences();
-  }, []);
+    if (session?.user) {
+      setNome(session.user.name || "");
+      if (session.user.email) {
+        setEmails([{ id: "1", value: session.user.email, type: "pessoal", isPrimary: true }]);
+      }
+      fetchPreferences();
+    }
+  }, [session]);
 
   const fetchPreferences = async () => {
     try {
@@ -73,6 +107,100 @@ export default function DashboardConfiguracoes() {
     } catch (error) {
       console.error("Erro ao buscar preferências:", error);
     }
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Arquivo muito grande",
+          description: "O avatar deve ter no máximo 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setAvatarFile(file);
+      setAvatarUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarFile(null);
+    setAvatarUrl("");
+  };
+
+  const handleSaveAvatar = async () => {
+    if (!avatarFile) return;
+    
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", avatarFile);
+      
+      const response = await fetch("/api/auth/upload-avatar", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Avatar atualizado!",
+          description: "Sua foto de perfil foi atualizada com sucesso.",
+        });
+        setAvatarFile(null);
+      } else {
+        throw new Error("Erro ao atualizar avatar");
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o avatar.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addEmail = () => {
+    setEmails([...emails, { id: Date.now().toString(), value: "", type: "pessoal", isPrimary: false }]);
+  };
+
+  const removeEmail = (id: string) => {
+    if (emails.length === 1) {
+      toast({
+        title: "Mínimo de emails",
+        description: "Você precisa ter pelo menos um email cadastrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEmails(emails.filter(e => e.id !== id));
+  };
+
+  const updateEmail = (id: string, value: string) => {
+    setEmails(emails.map(e => e.id === id ? { ...e, value } : e));
+  };
+
+  const addTelefone = () => {
+    setTelefones([...telefones, { id: Date.now().toString(), value: "", type: "whatsapp", isPrimary: false }]);
+  };
+
+  const removeTelefone = (id: string) => {
+    if (telefones.length === 1) {
+      toast({
+        title: "Mínimo de telefones",
+        description: "Você precisa ter pelo menos um telefone cadastrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setTelefones(telefones.filter(t => t.id !== id));
+  };
+
+  const updateTelefone = (id: string, value: string) => {
+    setTelefones(telefones.map(t => t.id === id ? { ...t, value } : t));
   };
 
   const updatePreference = async (key: keyof NotificationPreferences, value: boolean) => {
@@ -108,12 +236,117 @@ export default function DashboardConfiguracoes() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!senhaAtual || !novaSenha || !confirmarSenha) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos de senha.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (novaSenha !== confirmarSenha) {
+      toast({
+        title: "Senhas não conferem",
+        description: "A nova senha e a confirmação não são iguais.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (novaSenha.length < 6) {
+      toast({
+        title: "Senha muito curta",
+        description: "A senha deve ter pelo menos 6 caracteres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: senhaAtual,
+          newPassword: novaSenha,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Senha atualizada!",
+          description: "Sua senha foi atualizada com sucesso.",
+        });
+        setSenhaAtual("");
+        setNovaSenha("");
+        setConfirmarSenha("");
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao atualizar senha");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/update-profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: nome,
+          bio,
+          emails,
+          telefones,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Perfil atualizado!",
+          description: "Suas informações foram atualizadas com sucesso.",
+        });
+      } else {
+        throw new Error("Erro ao atualizar perfil");
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o perfil.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const tabs = [
     { id: "perfil", label: "Perfil", icon: User },
     { id: "notificacoes", label: "Notificações", icon: Bell },
     { id: "privacidade", label: "Privacidade", icon: Shield },
     { id: "aparicao", label: "Aparência", icon: Palette },
   ];
+
+  if (isLoadingSession) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -173,20 +406,41 @@ export default function DashboardConfiguracoes() {
                     {/* Avatar Upload */}
                     <div className="flex items-center gap-6">
                       <Avatar className="h-20 w-20">
-                        <AvatarImage src="/avatar.jpg" alt="User" />
+                        <AvatarImage src={avatarUrl || session?.user?.image || undefined} alt={nome} />
                         <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                          US
+                          {nome.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="space-y-2">
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Upload className="h-4 w-4" />
-                          Alterar Foto
-                        </Button>
-                        <Button variant="ghost" size="sm" className="gap-2 text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                          Remover
-                        </Button>
+                        <div className="flex gap-2">
+                          <label>
+                            <Button variant="outline" size="sm" className="gap-2 cursor-pointer">
+                              <Upload className="h-4 w-4" />
+                              Alterar Foto
+                            </Button>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleAvatarChange}
+                              className="hidden"
+                            />
+                          </label>
+                          {avatarUrl && (
+                            <>
+                              <Button variant="outline" size="sm" className="gap-2" onClick={handleSaveAvatar} disabled={isLoading}>
+                                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                Salvar
+                              </Button>
+                              <Button variant="ghost" size="sm" className="gap-2 text-destructive" onClick={handleRemoveAvatar}>
+                                <Trash2 className="h-4 w-4" />
+                                Remover
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          JPG, GIF ou PNG. Máximo de 5MB.
+                        </p>
                       </div>
                     </div>
 
@@ -194,36 +448,91 @@ export default function DashboardConfiguracoes() {
 
                     {/* Form */}
                     <div className="grid sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
+                      <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="nome">Nome Completo</Label>
-                        <Input id="nome" defaultValue="Usuário SoftRha" />
+                        <Input 
+                          id="nome" 
+                          value={nome}
+                          onChange={(e) => setNome(e.target.value)}
+                          placeholder="Seu nome completo"
+                        />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cargo">Cargo</Label>
-                        <Input id="cargo" defaultValue="Administrador" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input id="email" defaultValue="usuario@softrha.com" className="pl-10" />
+                      
+                      {/* Emails */}
+                      <div className="space-y-2 sm:col-span-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Emails</Label>
+                          <Button type="button" variant="outline" size="sm" onClick={addEmail}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Adicionar
+                          </Button>
                         </div>
+                        {emails.map((email, index) => (
+                          <div key={email.id} className="flex gap-2">
+                            <Input
+                              type="email"
+                              value={email.value}
+                              onChange={(e) => updateEmail(email.id, e.target.value)}
+                              placeholder="email@exemplo.com"
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeEmail(email.id)}
+                              disabled={emails.length === 1}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="telefone">Telefone</Label>
-                        <div className="relative">
-                          <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input id="telefone" defaultValue="(11) 99999-9999" className="pl-10" />
+
+                      {/* Telefones */}
+                      <div className="space-y-2 sm:col-span-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Telefones</Label>
+                          <Button type="button" variant="outline" size="sm" onClick={addTelefone}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Adicionar
+                          </Button>
                         </div>
+                        {telefones.map((telefone, index) => (
+                          <div key={telefone.id} className="flex gap-2">
+                            <Input
+                              value={telefone.value}
+                              onChange={(e) => updateTelefone(telefone.id, e.target.value)}
+                              placeholder="(00) 00000-0000"
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeTelefone(telefone.id)}
+                              disabled={telefones.length === 1}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
+
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="bio">Bio</Label>
-                        <Input id="bio" defaultValue="Desenvolvedor apaixonado por tecnologia" />
+                        <Textarea 
+                          id="bio" 
+                          value={bio}
+                          onChange={(e) => setBio(e.target.value)}
+                          placeholder="Conte um pouco sobre você..."
+                          rows={4}
+                        />
                       </div>
                     </div>
 
-                    <Button className="gap-2">
-                      <Save className="h-4 w-4" />
+                    <Button onClick={handleSaveProfile} className="gap-2" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       Salvar Alterações
                     </Button>
                   </CardContent>
@@ -245,6 +554,8 @@ export default function DashboardConfiguracoes() {
                         <Input
                           id="senha-atual"
                           type={showCurrentPassword ? "text" : "password"}
+                          value={senhaAtual}
+                          onChange={(e) => setSenhaAtual(e.target.value)}
                           className="pl-10 pr-10"
                         />
                         <button
@@ -262,6 +573,8 @@ export default function DashboardConfiguracoes() {
                         <Input
                           id="nova-senha"
                           type={showNewPassword ? "text" : "password"}
+                          value={novaSenha}
+                          onChange={(e) => setNovaSenha(e.target.value)}
                           className="pl-10 pr-10"
                         />
                         <button
@@ -279,12 +592,14 @@ export default function DashboardConfiguracoes() {
                         <Input
                           id="confirmar-senha"
                           type="password"
+                          value={confirmarSenha}
+                          onChange={(e) => setConfirmarSenha(e.target.value)}
                           className="pl-10"
                         />
                       </div>
                     </div>
-                    <Button className="gap-2">
-                      <Save className="h-4 w-4" />
+                    <Button onClick={handleChangePassword} className="gap-2" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       Atualizar Senha
                     </Button>
                   </CardContent>
@@ -303,120 +618,104 @@ export default function DashboardConfiguracoes() {
                   <CardHeader>
                     <CardTitle>Preferências de Notificação</CardTitle>
                     <CardDescription>
-                      Escolha como e quando deseja receber notificações
+                      Escolha como e quando você quer receber notificações
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Notificações por Email</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Receba atualizações e novidades por email
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <Mail className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Notificações por Email</p>
+                            <p className="text-sm text-muted-foreground">
+                              Receba atualizações e alertas por email
+                            </p>
+                          </div>
                         </div>
                         <Switch
                           checked={preferences.emailEnabled}
                           onCheckedChange={(checked) => updatePreference("emailEnabled", checked)}
                         />
                       </div>
+
                       <Separator />
+
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Notificações Push</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Receba notificações em tempo real no navegador
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <Bell className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Notificações Push</p>
+                            <p className="text-sm text-muted-foreground">
+                              Receba notificações no navegador
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {isSupported && (
-                            <>
-                              {permission === 'granted' ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={unsubscribeFromPush}
-                                  className="text-xs h-8"
-                                >
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  Desativar
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  onClick={subscribeToPush}
-                                  className="text-xs h-8"
-                                >
-                                  <Bell className="h-3 w-3 mr-1" />
-                                  Ativar
-                                </Button>
-                              )}
-                            </>
-                          )}
-                          <Switch
-                            checked={preferences.pushEnabled}
-                            onCheckedChange={(checked) => updatePreference("pushEnabled", checked)}
-                            disabled={!isSupported}
-                          />
-                        </div>
+                        <Switch
+                          checked={preferences.pushEnabled}
+                          onCheckedChange={(checked) => updatePreference("pushEnabled", checked)}
+                        />
                       </div>
-                      {!isSupported && (
-                        <p className="text-xs text-muted-foreground">
-                          Seu navegador não suporta notificações push.
-                        </p>
-                      )}
-                      {permission === 'denied' && (
-                        <p className="text-xs text-amber-600">
-                          ⚠️ Notificações bloqueadas. Permita nas configurações do navegador.
-                        </p>
-                      )}
+
                       <Separator />
+
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Notificações de Projetos</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Seja notificado sobre atualizações em projetos
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <Settings className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Atualizações de Projetos</p>
+                            <p className="text-sm text-muted-foreground">
+                              Mudanças de status e novas atividades
+                            </p>
+                          </div>
                         </div>
                         <Switch
                           checked={preferences.projectUpdates}
                           onCheckedChange={(checked) => updatePreference("projectUpdates", checked)}
                         />
                       </div>
-                      <Separator />
+
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Notificações de Tarefas</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Receba lembretes de tarefas e prazos
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <Check className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Atualizações de Tarefas</p>
+                            <p className="text-sm text-muted-foreground">
+                              Tarefas concluídas ou atribuídas
+                            </p>
+                          </div>
                         </div>
                         <Switch
                           checked={preferences.taskUpdates}
                           onCheckedChange={(checked) => updatePreference("taskUpdates", checked)}
                         />
                       </div>
-                      <Separator />
+
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Alertas de Orçamento</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Seja notificado sobre novos orçamentos
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <DollarSign className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Alertas de Orçamento</p>
+                            <p className="text-sm text-muted-foreground">
+                              Novos orçamentos e alterações
+                            </p>
+                          </div>
                         </div>
                         <Switch
                           checked={preferences.budgetAlerts}
                           onCheckedChange={(checked) => updatePreference("budgetAlerts", checked)}
                         />
                       </div>
-                      <Separator />
+
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Alertas de Clientes</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Seja notificado sobre novos clientes
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <User className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">Alertas de Clientes</p>
+                            <p className="text-sm text-muted-foreground">
+                              Novos clientes e atualizações
+                            </p>
+                          </div>
                         </div>
                         <Switch
                           checked={preferences.clientAlerts}
@@ -424,13 +723,10 @@ export default function DashboardConfiguracoes() {
                         />
                       </div>
                     </div>
-                    <Button className="gap-2" onClick={savePreferences} disabled={isLoading}>
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-                      {isLoading ? "Salvando..." : "Salvar Preferências"}
+
+                    <Button onClick={savePreferences} className="gap-2" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Salvar Preferências
                     </Button>
                   </CardContent>
                 </Card>
@@ -454,49 +750,39 @@ export default function DashboardConfiguracoes() {
                   <CardContent className="space-y-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Perfil Público</Label>
+                        <div>
+                          <p className="font-medium">Perfil Visível</p>
                           <p className="text-sm text-muted-foreground">
-                            Tornar seu perfil visível para outros membros
+                            Seu perfil será visível para outros membros da equipe
                           </p>
                         </div>
                         <Switch defaultChecked />
                       </div>
+
                       <Separator />
+
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Mostrar Email</Label>
+                        <div>
+                          <p className="font-medium">Atividade Visível</p>
                           <p className="text-sm text-muted-foreground">
-                            Exibir seu email para outros membros da equipe
-                          </p>
-                        </div>
-                        <Switch />
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Mostrar Telefone</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Exibir seu telefone para outros membros
-                          </p>
-                        </div>
-                        <Switch />
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label>Status Online</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Mostrar quando você está online
+                            Mostre sua atividade recente para a equipe
                           </p>
                         </div>
                         <Switch defaultChecked />
+                      </div>
+
+                      <Separator />
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">Email Visível</p>
+                          <p className="text-sm text-muted-foreground">
+                            Seu email será visível para outros membros
+                          </p>
+                        </div>
+                        <Switch />
                       </div>
                     </div>
-                    <Button className="gap-2">
-                      <Save className="h-4 w-4" />
-                      Salvar Configurações
-                    </Button>
                   </CardContent>
                 </Card>
 
@@ -504,21 +790,14 @@ export default function DashboardConfiguracoes() {
                   <CardHeader>
                     <CardTitle className="text-destructive">Zona de Perigo</CardTitle>
                     <CardDescription>
-                      Ações irreversíveis relacionadas à sua conta
+                      Ações irreversíveis na sua conta
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
-                      <div>
-                        <p className="font-medium">Excluir Conta</p>
-                        <p className="text-sm text-muted-foreground">
-                          Esta ação não pode ser desfeita
-                        </p>
-                      </div>
-                      <Button variant="destructive" size="sm">
-                        Excluir
-                      </Button>
-                    </div>
+                  <CardContent>
+                    <Button variant="destructive" className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Excluir Conta
+                    </Button>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -535,63 +814,47 @@ export default function DashboardConfiguracoes() {
                   <CardHeader>
                     <CardTitle>Configurações de Aparência</CardTitle>
                     <CardDescription>
-                      Personalize a aparência do dashboard
+                      Personalize a aparência do sistema
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                            <Moon className="h-5 w-5" />
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Moon className="h-5 w-5 text-primary" />
                           </div>
-                          <div className="space-y-0.5">
-                            <Label>Modo Escuro</Label>
+                          <div>
+                            <p className="font-medium">Modo Escuro</p>
                             <p className="text-sm text-muted-foreground">
-                              Alternar entre tema claro e escuro
+                              Alterne entre tema claro e escuro
                             </p>
                           </div>
                         </div>
                         <Switch />
                       </div>
+
                       <Separator />
+
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                            <Globe className="h-5 w-5" />
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Globe className="h-5 w-5 text-primary" />
                           </div>
-                          <div className="space-y-0.5">
-                            <Label>Idioma</Label>
+                          <div>
+                            <p className="font-medium">Idioma</p>
                             <p className="text-sm text-muted-foreground">
-                              Selecione o idioma da interface
+                              Selecione o idioma do sistema
                             </p>
                           </div>
                         </div>
-                        <Badge variant="outline">Português (BR)</Badge>
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                            <Sun className="h-5 w-5" />
-                          </div>
-                          <div className="space-y-0.5">
-                            <Label>Densidade</Label>
-                            <p className="text-sm text-muted-foreground">
-                              Ajustar espaçamento da interface
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Compacto</Button>
-                          <Button size="sm">Confortável</Button>
-                        </div>
+                        <select className="border rounded-md px-3 py-2 text-sm">
+                          <option value="pt-BR">Português (Brasil)</option>
+                          <option value="en">English</option>
+                          <option value="es">Español</option>
+                        </select>
                       </div>
                     </div>
-                    <Button className="gap-2">
-                      <Save className="h-4 w-4" />
-                      Salvar Preferências
-                    </Button>
                   </CardContent>
                 </Card>
               </motion.div>

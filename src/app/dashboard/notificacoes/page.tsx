@@ -96,7 +96,7 @@ export default function NotificacoesPage() {
       const response = await fetch("/api/notificacoes");
       if (!response.ok) throw new Error("Erro ao buscar notificações");
       const data = await response.json();
-      setNotifications(data);
+      setNotifications(data.notifications || []);
     } catch (error) {
       toast({
         title: "Erro",
@@ -110,7 +110,7 @@ export default function NotificacoesPage() {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/notificacoes/${notificationId}/read`, {
+      const response = await fetch(`/api/notificacoes/${notificationId}`, {
         method: "PATCH",
       });
 

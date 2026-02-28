@@ -15,27 +15,27 @@ datasource db {
 // ============================================
 
 model User {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String?
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
   password      String?
-  role          UserRole  @default(USER) // USER, ADMIN, TEAM_MEMBER, CLIENT
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  role          UserRole @default(USER) // USER, ADMIN, TEAM_MEMBER, CLIENT
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Campos adicionais para membros da equipe
-  teamRole      String?   // Cargo na equipe (ex: Developer, Designer, PM)
-  phone         String?   // Telefone
-  avatar        String?   // URL do avatar
-  status        String    @default("active") // active, busy, away, inactive
-  skills        Json?     // JSON array de habilidades
-  projectsCount Int       @default(0)
+  teamRole      String? // Cargo na equipe (ex: Developer, Designer, PM)
+  phone         String? // Telefone
+  avatar        String? // URL do avatar
+  status        String  @default("active") // active, busy, away, inactive
+  skills        Json? // JSON array de habilidades
+  projectsCount Int     @default(0)
 
   // Campos de registro
-  birthDate     DateTime? // Data de nascimento
-  sex           String?   // Sexo: male, female, other, prefer-not-say
+  birthDate DateTime? // Data de nascimento
+  sex       String? // Sexo: male, female, other, prefer-not-say
 
   // Relações
   accounts                Account[]
@@ -49,6 +49,13 @@ model User {
   notifications           Notification[]
   notificationPreferences UserNotificationPreference[]
   logs                    Log[] // Logs de ações do usuário
+  projectTeam             ProjectTeamMember[]          @relation("ProjectTeam") // Projetos onde é membro da equipe
+  receivedEvaluations     TeamEvaluation[]             @relation("MemberEvaluations") // Avaliações recebidas
+  givenEvaluations        TeamEvaluation[]             @relation("EvaluatorEvaluations") // Avaliações feitas
+  givenProjectEvaluations ProjectEvaluation[]          // Avaliações de projeto feitas
+  acceptedBudgets         Budget[]                     @relation("AcceptedBudgets") // Orçamentos aceitos pelo usuário
+  receivedProjectEvaluations ProjectMemberEvaluation[] @relation("MemberProjectEvaluations") // Avaliações recebidas em projetos
+  givenProjectMemberEvaluations ProjectMemberEvaluation[] @relation("EvaluatorProjectEvaluations") // Avaliações feitas em membros de projetos
 
   @@map("users")
 }
@@ -82,14 +89,14 @@ model Account {
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  expiresAt    DateTime
-  token        String   @unique
-  userAgent    String?
-  ipAddress    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  token     String   @unique
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -113,54 +120,164 @@ model Verification {
 // ============================================
 
 model Project {
-  id          String    @id @default(cuid())
-  name        String
-  description String?
-  status      String    @default("waiting_payment") // waiting_payment, planning, development_20, development_50, development_70, development_100, waiting_final_payment, completed, finished, cancelled
-  type        String // web, mobile, software, landing, ecommerce, dashboard
-  complexity  String // simple, medium, complex
-  timeline    String // urgent, normal, flexible
-  budget      Float?
-  clientId    String
-  clientName  String? // Nome do cliente (para projetos externos - legado)
-  createdById String? // Usuário que criou o projeto
-  tech        String? // Tecnologias (JSON array)
-  progress    Int       @default(0) // 0, 20, 50, 70, 100
-  dueDate     DateTime?
-  startDate   DateTime? // Data de início do projeto
-  completedAt DateTime?
-  gitRepositoryUrl String? // URL do repositório Git
-  testUrl String? // URL de teste do projeto (staging, preview)
-  lastUrlChangeReason UrlChangeReason? // Motivo da última alteração de URL
-  lastUrlChangeDescription String? @db.Text // Descrição/obs da última alteração de URL
-  lastUrlChangedAt DateTime? // Data da última alteração de URL
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                       String           @id @default(cuid())
+  name                     String
+  description              String?
+  status                   String           @default("waiting_payment") // waiting_payment, planning, development_20, development_50, development_70, development_100, waiting_final_payment, completed, finished, cancelled
+  type                     String // web, mobile, software, landing, ecommerce, dashboard
+  complexity               String // simple, medium, complex
+  timeline                 String // urgent, normal, flexible
+  budget                   Float?
+  clientId                 String
+  clientName               String? // Nome do cliente (para projetos externos - legado)
+  createdById              String? // Usuário que criou o projeto
+  tech                     String? // Tecnologias (JSON array)
+  progress                 Int              @default(0) // 0, 20, 50, 70, 100
+  dueDate                  DateTime?
+  startDate                DateTime? // Data de início do projeto
+  completedAt              DateTime?
+  gitRepositoryUrl         String? // URL do repositório Git
+  testUrl                  String? // URL de teste do projeto (staging, preview)
+  lastUrlChangeReason      UrlChangeReason? // Motivo da última alteração de URL
+  lastUrlChangeDescription String?          @db.Text // Descrição/obs da última alteração de URL
+  lastUrlChangedAt         DateTime? // Data da última alteração de URL
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
 
   // Relações
-  client     Client      @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  createdBy  User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  tasks      Task[]
-  milestones Milestone[]
-  activities Activity[]
-  payments   Payment[]
-  contract   Contract?
-  schedule   Schedule?
-  urlHistory ProjectUrlHistory[]
+  client      Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy   User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  tasks       Task[]
+  milestones  Milestone[]
+  activities  Activity[]
+  payments    Payment[]
+  contract    Contract?
+  schedule    Schedule?
+  urlHistory  ProjectUrlHistory[]
+  teamMembers ProjectTeamMember[]
+  evaluations TeamEvaluation[]
+  projectEvaluations ProjectEvaluation[]
+  projectMemberEvaluations ProjectMemberEvaluation[]
+  clientEvaluations ClientEvaluation[]
 
   @@map("projects")
 }
 
+// Membros da equipe do projeto
+model ProjectTeamMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String // Função/área no projeto (ex: Developer, Designer, PM)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade, name: "ProjectTeam")
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_team_members")
+}
+
+// Avaliação de membros da equipe em projetos
+model ProjectMemberEvaluation {
+  id            String   @id @default(cuid())
+  projectId     String
+  memberId      String // ID do membro avaliado (User.id)
+  evaluatorId   String // ID de quem avaliou
+  rating        Int      // 1-5 estrelas
+  participation Int      // 1-5 para participação
+  quality       Int      // 1-5 para qualidade
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  // Relações
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member    User    @relation("MemberProjectEvaluations", fields: [memberId], references: [id], onDelete: Cascade)
+  evaluator User    @relation("EvaluatorProjectEvaluations", fields: [evaluatorId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([memberId])
+  @@index([evaluatorId])
+  @@unique([projectId, memberId, evaluatorId]) // Uma avaliação por membro por projeto
+  @@map("project_member_evaluations")
+}
+
+// Avaliação de cliente em projetos
+model ClientEvaluation {
+  id            String   @id @default(cuid())
+  projectId     String
+  clientId      String // ID do cliente que avaliou
+  evaluatorId   String // ID de quem avaliou (pode ser o próprio cliente ou outro usuário)
+  rating        Int      // 1-5 estrelas - Avaliação Geral
+  participation Int      // 1-5 - Participação do cliente no projeto
+  quality       Int      // 1-5 - Qualidade do trabalho entregue
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  // Relações
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([clientId])
+  @@unique([projectId, clientId]) // Uma avaliação por cliente por projeto
+  @@map("client_evaluations")
+}
+
+// Avaliação de membros da equipe
+model TeamEvaluation {
+  id             String   @id @default(cuid())
+  projectId      String
+  memberId       String // ID do membro avaliado
+  evaluatorId    String // ID de quem avaliou
+  rating         Int      // 1-5 estrelas
+  comment        String?
+  detailedRatings String? // JSON com ratings detalhados
+  createdAt      DateTime @default(now())
+
+  // Relações
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member    User    @relation("MemberEvaluations", fields: [memberId], references: [id], onDelete: Cascade)
+  evaluator User    @relation("EvaluatorEvaluations", fields: [evaluatorId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([memberId])
+  @@index([evaluatorId])
+  @@map("team_evaluations")
+}
+
+// Avaliação geral do projeto
+model ProjectEvaluation {
+  id             String   @id @default(cuid())
+  projectId      String
+  evaluatorId    String // ID de quem avaliou
+  generalRating  Float    // Média geral
+  generalRatings String // JSON com ratings das perguntas
+  generalComment String?
+  createdAt      DateTime @default(now())
+
+  // Relações
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evaluator User    @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([evaluatorId])
+  @@map("project_evaluations")
+}
+
 // Histórico de alterações de URL do Projeto
 model ProjectUrlHistory {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   projectId   String
-  field       String   // git ou test
+  field       String // git ou test
   oldUrl      String?
   newUrl      String
   reason      UrlChangeReason
-  description String?  @db.Text
-  createdAt   DateTime @default(now())
+  description String?         @db.Text
+  createdAt   DateTime        @default(now())
 
   // Relações
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -208,17 +325,17 @@ model Milestone {
 }
 
 model Budget {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   projectId    String?
   userId       String
-  status       String   @default("pending") // pending, sent, accepted, rejected, user_approved, contract_sent, contract_signed, down_payment_sent, down_payment_paid, project_in_progress, final_payment_sent, final_payment_paid, completed
+  status       String  @default("pending") // pending, sent, accepted, rejected, user_approved, contract_sent, contract_signed, down_payment_sent, down_payment_paid, project_in_progress, final_payment_sent, final_payment_paid, completed
   projectType  String
   complexity   String
   timeline     String
   features     Json // Array de features selecionadas
   integrations Json // Array de integrações selecionadas
   technologies Json? // Array de tecnologias selecionadas
-  pages        Int      @default(1)
+  pages        Int     @default(1)
   estimatedMin Float?
   estimatedMax Float?
   finalValue   Float?
@@ -226,27 +343,35 @@ model Budget {
   clientEmail  String
   clientPhone  String?
   company      String?
-  details      String?  @db.Text
-  
+  details      String? @db.Text
+
   // Campos para justificativa de alteração/exclusão
-  changeReason Select? // motivo selecionado (obrigatório)
-  changeDescription String? @db.Text // descrição do motivo (opcional)
-  deletionReason Select? // motivo selecionado (obrigatório)
+  changeReason        Select? // motivo selecionado (obrigatório)
+  changeDescription   String? @db.Text // descrição do motivo (opcional)
+  deletionReason      Select? // motivo selecionado (obrigatório)
   deletionDescription String? @db.Text // descrição do motivo (opcional)
-  
+
   // Token para aprovação do cliente via link
-  approvalToken String? @unique
+  approvalToken        String?   @unique
   approvalTokenExpires DateTime?
-  userApprovedAt DateTime?
-  startDate  DateTime? // Data de início do projeto
+  userApprovedAt       DateTime?
+  startDate            DateTime? // Data de início do projeto
+
+  // Controle de aceite do gerente/equipe
+  acceptedBy         String? // ID do usuário que aceitou
+  acceptedAt         DateTime?
+  declinedBy         String? // ID do usuário que recusou
+  declinedAt         DateTime?
+  declineReason      String? @db.Text // Motivo da recusa
 
   // Relações
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments Payment[]
-  contract Contract?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acceptedByUser User?     @relation("AcceptedBudgets", fields: [acceptedBy], references: [id], onDelete: SetNull)
+  payments       Payment[]
+  contract       Contract?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("budgets")
 }
@@ -310,22 +435,22 @@ enum LogLevel {
 }
 
 model Payment {
-  id          String   @id @default(cuid())
-  budgetId    String
-  projectId   String?
-  amount      Float
-  type        String   // down_payment (25%), final_payment (75%), milestone
-  status      String   @default("pending") // pending, paid, cancelled, expired
-  description String?
+  id                  String    @id @default(cuid())
+  budgetId            String
+  projectId           String?
+  amount              Float
+  type                String // down_payment (25%), final_payment (75%), milestone
+  status              String    @default("pending") // pending, paid, cancelled, expired
+  description         String?
   stripePaymentLinkId String?
   stripePaymentId     String?
-  paidAt    DateTime?
-  dueDate   DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  paidAt              DateTime?
+  dueDate             DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // Relações
-  budget  Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budget  Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@map("payments")
@@ -333,23 +458,23 @@ model Payment {
 
 // Modelo de Contrato
 model Contract {
-  id              String   @id @default(cuid())
-  budgetId        String   @unique
-  projectId       String?  @unique
-  documentUrl     String?  // URL do contrato armazenado
-  documentName    String?  // Nome do arquivo
-  status          String   @default("pending") // pending, sent, signed_by_client, signed, confirmed
-  sentAt          DateTime?
+  id               String    @id @default(cuid())
+  budgetId         String    @unique
+  projectId        String?   @unique
+  documentUrl      String? // URL do contrato armazenado
+  documentName     String? // Nome do arquivo
+  status           String    @default("pending") // pending, sent, signed_by_client, signed, confirmed
+  sentAt           DateTime?
   signedByClientAt DateTime?
-  signedAt        DateTime?
-  confirmed       Boolean  @default(false) // Gestor confirmou o contrato assinado
-  content         String?  @db.Text // Conteúdo do contrato em texto
-  metadata        Json?    // Dados adicionais do contrato
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  signedAt         DateTime?
+  confirmed        Boolean   @default(false) // Gestor confirmou o contrato assinado
+  content          String?   @db.Text // Conteúdo do contrato em texto
+  metadata         Json? // Dados adicionais do contrato
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relações
-  budget  Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budget  Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@map("contracts")
@@ -357,19 +482,19 @@ model Contract {
 
 // Modelo de Agendamento de Entrega
 model Schedule {
-  id              String   @id @default(cuid())
-  projectId       String   @unique
-  date            DateTime // Data do agendamento
-  time            String   // Horário do agendamento (HH:mm)
-  type            String   // video, audio
-  status          String   @default("scheduled") // scheduled, completed, cancelled, rescheduled, pending_reschedule
-  meetingLink     String?  // Link da reunião (Google Meet, Zoom, etc.)
-  notes           String?  @db.Text // Observações adicionais
-  rescheduleReason String? @db.Text // Motivo do reagendamento (se houver)
-  cancellationReason String? @db.Text // Motivo do cancelamento (se houver)
-  history         Json?    // Histórico de tentativas [{date, time, type, status, reason, createdAt}]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  date               DateTime // Data do agendamento
+  time               String // Horário do agendamento (HH:mm)
+  type               String // video, audio
+  status             String   @default("scheduled") // scheduled, completed, cancelled, rescheduled, pending_reschedule
+  meetingLink        String? // Link da reunião (Google Meet, Zoom, etc.)
+  notes              String?  @db.Text // Observações adicionais
+  rescheduleReason   String?  @db.Text // Motivo do reagendamento (se houver)
+  cancellationReason String?  @db.Text // Motivo do cancelamento (se houver)
+  history            Json? // Histórico de tentativas [{date, time, type, status, reason, createdAt}]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Relações
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -432,28 +557,32 @@ model Activity {
 // ============================================
 
 model Client {
-  id           String   @id @default(cuid())
-  firstName    String
-  lastName     String
-  name         String // Nome completo (calculado)
-  documentType String   @default("cpf") // cpf ou cnpj
-  document     String   @unique
-  emails       String? // JSON: [{id, value, type, isPrimary}]
-  phones       String? // JSON: [{id, value, type, isPrimary}]
-  address      String?
-  number       String?
-  complement   String?
-  neighborhood String?
-  city         String?
-  state        String?
-  zipCode      String?
-  status       String   @default("active") // active, inactive
-  notes        String?  @db.Text
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String    @id @default(cuid())
+  firstName      String
+  lastName       String
+  name           String // Nome completo (calculado)
+  documentType   String    @default("cpf") // cpf ou cnpj
+  document       String    @unique
+  emails         String? // JSON: [{id, value, type, isPrimary}]
+  phones         String? // JSON: [{id, value, type, isPrimary}]
+  address        String?
+  number         String?
+  complement     String?
+  neighborhood   String?
+  city           String?
+  state          String?
+  zipCode        String?
+  status         String    @default("active") // active, inactive, deleted
+  notes          String?   @db.Text
+  deletedAt      DateTime? // Data da exclusão (soft delete)
+  deletedBy      String? // ID do usuário que excluiu
+  deletionReason String?   @db.Text // Motivo da exclusão
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relações
-  projects Project[]
+  projects         Project[]
+  clientEvaluations ClientEvaluation[]
 
   @@map("clients")
 }
@@ -556,20 +685,20 @@ model UserNotificationPreference {
 // ============================================
 
 model Log {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   type        LogType
   category    LogCategory
-  level       LogLevel @default(INFO)
-  userId      String?  // Usuário que realizou a ação (pode ser null para ações do sistema)
-  entityId    String?  // ID do registro afetado (projeto, orçamento, etc.)
-  entityType  String?  // Tipo de entidade (Project, Budget, Client, etc.)
-  action      String   // Descrição da ação realizada
-  description String?  @db.Text // Descrição detalhada
-  metadata    Json?    // Dados adicionais da operação
-  changes     Json?    // Registro das mudanças (antes/depois)
-  ipAddress   String?  // IP da requisição
-  userAgent   String?  // User agent do navegador
-  createdAt   DateTime @default(now())
+  level       LogLevel    @default(INFO)
+  userId      String? // Usuário que realizou a ação (pode ser null para ações do sistema)
+  entityId    String? // ID do registro afetado (projeto, orçamento, etc.)
+  entityType  String? // Tipo de entidade (Project, Budget, Client, etc.)
+  action      String // Descrição da ação realizada
+  description String?     @db.Text // Descrição detalhada
+  metadata    Json? // Dados adicionais da operação
+  changes     Json? // Registro das mudanças (antes/depois)
+  ipAddress   String? // IP da requisição
+  userAgent   String? // User agent do navegador
+  createdAt   DateTime    @default(now())
 
   // Relações
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)

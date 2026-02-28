@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
 import {
   FolderKanban,
@@ -19,6 +20,9 @@ import {
   Trash2,
   XCircle,
   Edit,
+  Phone,
+  Mail,
+  Users,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoProjetoModal } from "@/components/modals/novo-projeto-modal";
@@ -34,121 +38,123 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
   // Status exatos da página projetos/[id]
-  "waiting_payment": { 
-    color: "text-amber-600", 
-    bg: "bg-amber-50", 
+  "waiting_payment": {
+    color: "text-amber-600",
+    bg: "bg-amber-50",
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Aguardando Pagamento"
   },
-  "planning": { 
-    color: "text-blue-600", 
-    bg: "bg-blue-50", 
+  "planning": {
+    color: "text-blue-600",
+    bg: "bg-blue-50",
     icon: <Filter className="h-3.5 w-3.5" />,
     label: "Planejamento"
   },
-  "development": { 
-    color: "text-purple-600", 
-    bg: "bg-purple-50", 
+  "development": {
+    color: "text-purple-600",
+    bg: "bg-purple-50",
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "Em Desenvolvimento"
   },
-  "development_20": { 
-    color: "text-blue-600", 
-    bg: "bg-blue-50", 
+  "development_20": {
+    color: "text-blue-600",
+    bg: "bg-blue-50",
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "20% Concluído"
   },
-  "development_50": { 
-    color: "text-blue-600", 
-    bg: "bg-blue-50", 
+  "development_50": {
+    color: "text-blue-600",
+    bg: "bg-blue-50",
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "50% Concluído"
   },
-  "development_70": { 
-    color: "text-purple-600", 
-    bg: "bg-purple-50", 
+  "development_70": {
+    color: "text-purple-600",
+    bg: "bg-purple-50",
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "70% Concluído"
   },
-  "development_100": { 
-    color: "text-green-600", 
-    bg: "bg-green-50", 
+  "development_100": {
+    color: "text-green-600",
+    bg: "bg-green-50",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "100% Concluído"
   },
-  "waiting_final_payment": { 
-    color: "text-amber-600", 
-    bg: "bg-amber-50", 
+  "waiting_final_payment": {
+    color: "text-amber-600",
+    bg: "bg-amber-50",
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Aguardando Pagamento Final"
   },
-  "completed": { 
-    color: "text-green-600", 
-    bg: "bg-green-50", 
+  "completed": {
+    color: "text-green-600",
+    bg: "bg-green-50",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Concluído (Aguardando Entrega)"
   },
-  "finished": { 
-    color: "text-emerald-600", 
-    bg: "bg-emerald-50", 
+  "finished": {
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Finalizado (Entregue)"
   },
-  "cancelled": { 
-    color: "text-red-600", 
-    bg: "bg-red-50", 
+  "cancelled": {
+    color: "text-red-600",
+    bg: "bg-red-50",
     icon: <XCircle className="h-3.5 w-3.5" />,
     label: "Cancelado"
   },
   // Alias em português para os filtros
-  "Aguardando Pagamento": { 
-    color: "text-amber-600", 
-    bg: "bg-amber-50", 
+  "Aguardando Pagamento": {
+    color: "text-amber-600",
+    bg: "bg-amber-50",
     icon: <DollarSign className="h-3.5 w-3.5" />,
     label: "Aguardando Pagamento"
   },
-  "Planejamento": { 
-    color: "text-blue-600", 
-    bg: "bg-blue-50", 
+  "Planejamento": {
+    color: "text-blue-600",
+    bg: "bg-blue-50",
     icon: <Filter className="h-3.5 w-3.5" />,
     label: "Planejamento"
   },
-  "Em Desenvolvimento": { 
-    color: "text-purple-600", 
-    bg: "bg-purple-50", 
+  "Em Desenvolvimento": {
+    color: "text-purple-600",
+    bg: "bg-purple-50",
     icon: <Clock className="h-3.5 w-3.5" />,
     label: "Em Desenvolvimento"
   },
-  "Em Revisão": { 
-    color: "text-yellow-600", 
-    bg: "bg-yellow-50", 
+  "Em Revisão": {
+    color: "text-yellow-600",
+    bg: "bg-yellow-50",
     icon: <AlertCircle className="h-3.5 w-3.5" />,
     label: "Em Revisão"
   },
-  "Concluído (Aguardando Entrega)": { 
-    color: "text-green-600", 
-    bg: "bg-green-50", 
+  "Concluído (Aguardando Entrega)": {
+    color: "text-green-600",
+    bg: "bg-green-50",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Concluído (Aguardando Entrega)"
   },
-  "Finalizado (Entregue)": { 
-    color: "text-emerald-600", 
-    bg: "bg-emerald-50", 
+  "Finalizado (Entregue)": {
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     label: "Finalizado (Entregue)"
   },
-  "Cancelado": { 
-    color: "text-red-600", 
-    bg: "bg-red-50", 
+  "Cancelado": {
+    color: "text-red-600",
+    bg: "bg-red-50",
     icon: <XCircle className="h-3.5 w-3.5" />,
     label: "Cancelado"
   },
-  "review": { 
-    color: "text-yellow-600", 
-    bg: "bg-yellow-50", 
+  "review": {
+    color: "text-yellow-600",
+    bg: "bg-yellow-50",
     icon: <AlertCircle className="h-3.5 w-3.5" />,
     label: "Em Revisão"
   },
@@ -166,6 +172,9 @@ export default function DashboardProjetos() {
   const [loading, setLoading] = useState(true);
   const [pendenteModalOpen, setPendenteModalOpen] = useState(false);
   const [projectToEditPendente, setProjectToEditPendente] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [projectDetailsModalOpen, setProjectDetailsModalOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
 
   // Hook de atualizações em tempo real
   const { refresh, hasUpdates } = useRealTimeUpdates("projetos", {
@@ -180,6 +189,54 @@ export default function DashboardProjetos() {
       }
     },
   });
+
+  // Buscar usuário atual
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentUser(data);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar usuário atual:", error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  // Função para mascarar email
+  const maskEmail = (email: string) => {
+    if (!email) return "";
+    const [username, domain] = email.split("@");
+    if (username.length <= 2) return email;
+    const maskedUsername = username.charAt(0) + "*".repeat(username.length - 2) + username.charAt(username.length - 1);
+    return `${maskedUsername}@${domain}`;
+  };
+
+  // Função para mascarar telefone
+  const maskPhone = (phone: string) => {
+    if (!phone) return "";
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) return phone;
+    
+    if (digits.length === 10) {
+      // (XX) XXXX-XX**
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 8)}**`;
+    } else {
+      // (XX) XXXXX-XX**
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 9)}**`;
+    }
+  };
+
+  // Abrir modal de detalhes do projeto
+  const handleOpenProjectDetails = (project: any, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedProject(project);
+    setProjectDetailsModalOpen(true);
+  };
 
   // Carregar projetos do banco de dados
   const fetchProjects = async () => {
@@ -252,23 +309,23 @@ export default function DashboardProjetos() {
 
     try {
       console.log("Atualizando projeto pendente:", projectToEditPendente.id, data);
-      
+
       // Converter datas para formato ISO
       const updateData: any = {};
-      
+
       if (data.budget !== undefined) {
         updateData.budget = parseFloat(data.budget);
       }
-      
+
       if (data.dueDate) {
         updateData.dueDate = new Date(data.dueDate).toISOString();
       }
-      
+
       if (data.startDate) {
         // Se houver campo startDate no banco, senão podemos usar um campo personalizado
         updateData.startDate = new Date(data.startDate).toISOString();
       }
-      
+
       const response = await fetch(`/api/projetos/${projectToEditPendente.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -363,7 +420,7 @@ export default function DashboardProjetos() {
   const filteredProjects = projectsList.filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.client.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     // Normalizar status para comparação (baseado nos status da página projetos/[id])
     const normalizeStatus = (status: string) => {
       // Mapeamento exato dos status do sistema
@@ -400,20 +457,20 @@ export default function DashboardProjetos() {
 
     const projectStatusNormalized = normalizeStatus(project.status);
     const filterStatusNormalized = normalizeStatus(statusFilter);
-    
-    const matchesStatus = statusFilter === "todos" || 
-      project.status === statusFilter || 
+
+    const matchesStatus = statusFilter === "todos" ||
+      project.status === statusFilter ||
       projectStatusNormalized === filterStatusNormalized;
-    
+
     return matchesSearch && matchesStatus;
   });
 
   // Normalizar status para stats (agrupar desenvolvimento)
   const normalizeToGroup = (status: string) => {
     // Agrupar todas as variações de desenvolvimento
-    if (["development", "development_20", "development_50", "development_70", "development_100", 
-         "Em Desenvolvimento", "20% Concluído", "50% Concluído", "70% Concluído", "100% Concluído"]
-        .includes(status)) {
+    if (["development", "development_20", "development_50", "development_70", "development_100",
+      "Em Desenvolvimento", "20% Concluído", "50% Concluído", "70% Concluído", "100% Concluído"]
+      .includes(status)) {
       return "development";
     }
     const map: Record<string, string> = {
@@ -446,9 +503,9 @@ export default function DashboardProjetos() {
       return s === "planning";
     }).length,
     development: projectsList.filter(p => {
-      const s = ["development", "development_20", "development_50", "development_70", "development_100", 
-                 "Em Desenvolvimento", "20% Concluído", "50% Concluído", "70% Concluído", "100% Concluído"]
-                .includes(p.status);
+      const s = ["development", "development_20", "development_50", "development_70", "development_100",
+        "Em Desenvolvimento", "20% Concluído", "50% Concluído", "70% Concluído", "100% Concluído"]
+        .includes(p.status);
       return s;
     }).length,
     completed: projectsList.filter(p => {
@@ -635,102 +692,127 @@ export default function DashboardProjetos() {
           {filteredProjects.map((project, index) => {
             const status = statusConfig[project.status] || statusConfig["planning"];
             const isPendente = project.status === "waiting_payment" || project.status === "Aguardando Pagamento" || status?.label === "Aguardando Pagamento";
-            
+            const isCreator = currentUser && project.createdById === currentUser.id;
+
             return (
               <div key={project.id} className="relative">
-                <Link
-                  href={`/dashboard/projetos/${project.id}`}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                  onClick={(e) => {
+                    if (!isCreator) {
+                      handleOpenProjectDetails(project, e);
+                    }
+                  }}
+                  className={`${!isCreator ? 'cursor-pointer' : ''}`}
                 >
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                  >
-                    <Card className="h-full overflow-hidden hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
-                      {/* Card Header with Status */}
-                      <div className={`${status.bg} px-4 py-3 border-b`}>
-                        <div className="flex items-center justify-between">
-                          <div className={`flex items-center gap-2 ${status.color} font-semibold text-sm`}>
-                            {status.icon}
-                            <span>{status.label}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground font-medium">
-                            {new Date(project.dueDate).toLocaleDateString("pt-BR")}
-                          </div>
+                  <Card className={`h-full overflow-hidden hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20 ${!isCreator ? 'ring-2 ring-offset-2 ring-blue-500/50' : ''}`}>
+                    {/* Card Header with Status */}
+                    <div className={`${status.bg} px-4 py-3 border-b`}>
+                      <div className="flex items-center justify-between">
+                        <div className={`flex items-center gap-2 ${status.color} font-semibold text-sm`}>
+                          {status.icon}
+                          <span>{status.label}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground font-medium">
+                          Criado em: {new Date(project.createdAt).toLocaleDateString("pt-BR")}
+                        </div>
+                      </div>
+                    </div>
+
+                    <CardContent className="pt-4 pb-4">
+                      {/* Project Name & Client */}
+                      <div className="mb-4">
+                        <h3 className="font-bold text-lg mb-1 line-clamp-1">{project.name}</h3>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <FolderKanban className="h-3.5 w-3.5" />
+                          {project.client}
+                        </p>
+                      </div>
+
+                      {/* Criador do Projeto */}
+                      <div className="mb-4 pb-3 border-b">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                              {project.createdBy?.name?.charAt(0) || "C"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-muted-foreground">
+                            Criado por: <span className="font-medium text-foreground">{project.createdBy?.name || "Desconhecido"}</span>
+                          </span>
                         </div>
                       </div>
 
-                      <CardContent className="pt-4 pb-4">
-                        {/* Project Name & Client */}
-                        <div className="mb-4">
-                          <h3 className="font-bold text-lg mb-1 line-clamp-1">{project.name}</h3>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            <FolderKanban className="h-3.5 w-3.5" />
-                            {project.client}
-                          </p>
-                        </div>
+                      {/* Tech Stack */}
+                      <div className="flex flex-wrap gap-1.5 mb-4 min-h-[32px]">
+                        {project.tech?.slice(0, 4).map((tech: string, i: number) => (
+                          <Badge
+                            key={tech}
+                            variant="secondary"
+                            className="text-xs font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
+                          >
+                            {tech}
+                          </Badge>
+                        ))}
+                        {project.tech?.length > 4 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{project.tech.length - 4}
+                          </Badge>
+                        )}
+                      </div>
 
-                        {/* Tech Stack */}
-                        <div className="flex flex-wrap gap-1.5 mb-4 min-h-[32px]">
-                          {project.tech?.slice(0, 4).map((tech: string, i: number) => (
-                            <Badge
-                              key={tech}
-                              variant="secondary"
-                              className="text-xs font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
+                      {/* Progress Bar */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-muted-foreground">Progresso</span>
+                          <span className="text-xs font-bold">{project.progress}%</span>
+                        </div>
+                        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500"
+                            style={{ width: `${project.progress}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Team */}
+                      <div className="flex items-center justify-between pt-3 border-t">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Users className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium">{project.team?.length || 0} membro(s)</span>
+                        </div>
+                        <div className="flex -space-x-2">
+                          {project.team?.slice(0, 3).map((member: any, i: number) => (
+                            <div
+                              key={`${member.id || 'member'}-${i}`}
+                              className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center text-xs font-bold text-white border-2 border-white shadow-sm"
+                              title={member.name || 'Membro da equipe'}
                             >
-                              {tech}
-                            </Badge>
+                              {(member.name || 'M').charAt(0).toUpperCase()}
+                            </div>
                           ))}
-                          {project.tech?.length > 4 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{project.tech.length - 4}
-                            </Badge>
+                          {project.team && project.team.length > 3 && (
+                            <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 border-2 border-white">
+                              +{project.team.length - 3}
+                            </div>
                           )}
                         </div>
-
-                        {/* Progress Bar */}
-                        <div className="mb-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-muted-foreground">Progresso</span>
-                            <span className="text-xs font-bold">{project.progress}%</span>
-                          </div>
-                          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500"
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Tasks & Team */}
-                        <div className="flex items-center justify-between pt-3 border-t">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                            <span className="font-medium">{project.tasks?.completed || 0}/{project.tasks?.total || 0} tarefas</span>
-                          </div>
-                          <div className="flex -space-x-2">
-                            {project.team?.slice(0, 3).map((member: string, i: number) => (
-                              <div
-                                key={i}
-                                className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center text-xs font-bold text-white border-2 border-white shadow-sm"
-                                title={member}
-                              >
-                                {member.charAt(0).toUpperCase()}
-                              </div>
-                            ))}
-                            {project.team?.length > 3 && (
-                              <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 border-2 border-white">
-                                +{project.team.length - 3}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                      </div>
                       </CardContent>
                     </Card>
                   </motion.div>
-                </Link>
-                
+
+                  {/* Link apenas para o criador */}
+                  {isCreator && (
+                    <Link
+                      href={`/dashboard/projetos/${project.id}`}
+                      className="absolute inset-0 z-0"
+                    />
+                  )}
+
                 {/* Botão Alterar para projetos Pendentes */}
                 {isPendente && (
                   <div className="absolute top-2 right-2 z-10">
@@ -784,6 +866,166 @@ export default function DashboardProjetos() {
             </CardContent>
           </Card>
         )}
+
+        {/* Modal de Detalhes do Projeto (apenas visualização com dados mascarados) */}
+        <Dialog open={projectDetailsModalOpen} onOpenChange={setProjectDetailsModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FolderKanban className="h-5 w-5 text-primary" />
+                Detalhes do Projeto
+              </DialogTitle>
+              <DialogDescription>
+                Visualização das informações do projeto
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedProject && (
+              <div className="space-y-6">
+                {/* Informações Básicas */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Nome do Projeto</Label>
+                    <p className="font-semibold text-lg">{selectedProject.name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Cliente</Label>
+                    <p className="font-medium">{selectedProject.client}</p>
+                  </div>
+                </div>
+
+                {/* Criador */}
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                      {selectedProject.createdBy?.name?.charAt(0) || "C"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <Label className="text-muted-foreground">Criado por</Label>
+                    <p className="font-medium">{selectedProject.createdBy?.name || "Desconhecido"}</p>
+                  </div>
+                </div>
+
+                {/* Status e Progresso */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Status</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      {statusConfig[selectedProject.status]?.icon}
+                      <span className={`font-medium ${statusConfig[selectedProject.status]?.color}`}>
+                        {statusConfig[selectedProject.status]?.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Progresso</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full"
+                          style={{ width: `${selectedProject.progress}%` }}
+                        />
+                      </div>
+                      <span className="font-bold">{selectedProject.progress}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contato do Cliente (mascarado) */}
+                <div className="grid sm:grid-cols-2 gap-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div>
+                    <Label className="text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      E-mail do Cliente
+                    </Label>
+                    <p className="font-mono text-sm mt-1 text-blue-900 dark:text-blue-100">
+                      {maskEmail(selectedProject.clientEmail || selectedProject.budget?.clientEmail)}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      Telefone do Cliente
+                    </Label>
+                    <p className="font-mono text-sm mt-1 text-blue-900 dark:text-blue-100">
+                      {maskPhone(selectedProject.clientPhone || selectedProject.budget?.clientPhone)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tecnologias */}
+                {selectedProject.tech && selectedProject.tech.length > 0 && (
+                  <div>
+                    <Label className="text-muted-foreground mb-2 block">Tecnologias</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedProject.tech.map((tech: string, i: number) => (
+                        <Badge key={i} variant="secondary" className="text-xs">
+                          {tech}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Membros da Equipe */}
+                {selectedProject.team && selectedProject.team.length > 0 && (
+                  <div>
+                    <Label className="text-muted-foreground mb-2 block flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Membros da Equipe ({selectedProject.team.length})
+                    </Label>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {selectedProject.team.map((member: any, i: number) => (
+                        <div
+                          key={`${member.id || 'member'}-${i}`}
+                          className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border"
+                        >
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                              {(member.name || 'M').charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{member.name || 'Membro da equipe'}</p>
+                            <p className="text-xs text-muted-foreground truncate">{member.email || 'email@exemplo.com'}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Prazo */}
+                {selectedProject.dueDate && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <Label className="text-muted-foreground">Prazo:</Label>
+                    <span className="font-medium">
+                      {new Date(selectedProject.dueDate).toLocaleDateString("pt-BR")}
+                    </span>
+                  </div>
+                )}
+
+                {/* Descrição */}
+                {selectedProject.description && (
+                  <div>
+                    <Label className="text-muted-foreground mb-2 block">Descrição</Label>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {selectedProject.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setProjectDetailsModalOpen(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <NovoProjetoModal
           open={modalOpen}

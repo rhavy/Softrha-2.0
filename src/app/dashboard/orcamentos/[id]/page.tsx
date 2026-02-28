@@ -53,6 +53,7 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
+import { hasToastBeenShown, markToastAsShown } from "@/lib/toast-dedup";
 import {
   Dialog,
   DialogContent,
@@ -98,6 +99,15 @@ interface Budget {
   approvalToken?: string | null;
   contract?: any;
   technologies?: string[] | any;
+  acceptedBy?: string | null;
+  acceptedAt?: string | null;
+  acceptedByUser?: {
+    name?: string | null;
+    email?: string | null;
+  } | null;
+  user?: {
+    name?: string | null;
+  } | null;
 }
 
 const statusLabels: Record<string, string> = {
@@ -148,6 +158,11 @@ export default function OrcamentoDetalhesPage() {
   const { toast } = useToast();
   const [budget, setBudget] = useState<Budget | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAcceptDialogOpen, setIsAcceptDialogOpen] = useState(false);
+  const [acceptAction, setAcceptAction] = useState<"accept" | "decline">("accept");
+  const [declineReason, setDeclineReason] = useState("");
+  const [isAccepting, setIsAccepting] = useState(false);
 
   // Dialogs
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -212,6 +227,7 @@ export default function OrcamentoDetalhesPage() {
 
   useEffect(() => {
     if (params.id) {
+      fetchCurrentUser();
       fetchBudget();
       fetchActionHistory();
 
@@ -228,6 +244,24 @@ export default function OrcamentoDetalhesPage() {
     }
   }, [params.id]);
 
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        console.log("[DEBUG] Current user:", {
+          id: data.id,
+          role: data.role,
+          teamRole: data.teamRole,
+          name: data.name,
+        });
+        setCurrentUser(data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuário atual:", error);
+    }
+  };
+
   const fetchBudget = async (showLoading = true) => {
     try {
       if (showLoading) {
@@ -240,6 +274,9 @@ export default function OrcamentoDetalhesPage() {
       console.log("[DEBUG] Budget recebido:", {
         id: data.id,
         status: data.status,
+        acceptedBy: data.acceptedBy,
+        acceptedAt: data.acceptedAt,
+        acceptedByUser: data.acceptedByUser,
         projectId: data.projectId,
         contract: data.contract?.id,
         contractConfirmed: data.contract?.confirmed,
@@ -255,12 +292,18 @@ export default function OrcamentoDetalhesPage() {
       // Se status mudou para down_payment_paid, mostrar botões
       if (data.status === "down_payment_paid") {
         console.log("[DEBUG] Status é down_payment_paid, projectId:", data.projectId);
-        toast({
-          title: "Pagamento Confirmado!",
-          description: data.projectId
-            ? "Projeto criado automaticamente. Clique em 'Ver Projeto' para acessar."
-            : "Pagamento confirmado. Inicie o projeto para continuar.",
-        });
+        
+        // Verificar se toast já foi exibido
+        const toastId = `payment-confirmed-${params.id}`;
+        if (!hasToastBeenShown(toastId)) {
+          markToastAsShown(toastId);
+          toast({
+            title: "Pagamento Confirmado!",
+            description: data.projectId
+              ? "Projeto criado automaticamente. Clique em 'Ver Projeto' para acessar."
+              : "Pagamento confirmado. Inicie o projeto para continuar.",
+          });
+        }
       }
     } catch (error) {
       if (showLoading) {
@@ -458,10 +501,15 @@ export default function OrcamentoDetalhesPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
 
-      toast({
-        title: "Proposta enviada!",
-        description: "Link de aprovação gerado com sucesso",
-      });
+      // Verificar se toast já foi exibido
+      const toastId = `proposal-sent-${params.id}`;
+      if (!hasToastBeenShown(toastId)) {
+        markToastAsShown(toastId);
+        toast({
+          title: "Proposta enviada!",
+          description: "Link de aprovação gerado com sucesso",
+        });
+      }
 
       setIsApproveDialogOpen(false);
 
@@ -485,6 +533,46 @@ export default function OrcamentoDetalhesPage() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleAcceptBudget = async () => {
+    try {
+      setIsAccepting(true);
+      const response = await fetch(`/api/orcamentos/${params.id}/aceitar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: acceptAction,
+          reason: acceptAction === "decline" ? declineReason : null,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+
+      toast({
+        title: acceptAction === "accept" ? "Orçamento aceito!" : "Orçamento recusado",
+        description: result.message,
+        variant: acceptAction === "accept" ? "success" : "destructive",
+      });
+
+      setIsAcceptDialogOpen(false);
+      setDeclineReason("");
+      fetchBudget();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  const isAcceptedByCurrentUser = () => {
+    if (!currentUser || !budget) return false;
+    return budget.acceptedBy === currentUser.id;
   };
 
   const handleEditValue = async () => {
@@ -593,15 +681,25 @@ export default function OrcamentoDetalhesPage() {
       if (result.paymentLink) {
         setPaymentLink(result.paymentLink);
         setIsPaymentLinkDialogOpen(true);
-        toast({
-          title: "Link gerado!",
-          description: "Link de pagamento da entrada (25%) criado com sucesso",
-        });
+        
+        // Verificar se toast já foi exibido
+        const toastId = `payment-link-generated-${params.id}`;
+        if (!hasToastBeenShown(toastId)) {
+          markToastAsShown(toastId);
+          toast({
+            title: "Link gerado!",
+            description: "Link de pagamento da entrada (25%) criado com sucesso",
+          });
+        }
       } else {
-        toast({
-          title: "Pagamento já realizado",
-          description: "O cliente já realizou o pagamento da entrada ",
-        });
+        const toastId = `payment-already-done-${params.id}`;
+        if (!hasToastBeenShown(toastId)) {
+          markToastAsShown(toastId);
+          toast({
+            title: "Pagamento já realizado",
+            description: "O cliente já realizou o pagamento da entrada ",
+          });
+        }
       }
 
       fetchBudget();
@@ -813,8 +911,10 @@ export default function OrcamentoDetalhesPage() {
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
-              {/* Status: pending */}
-              {budget.status === "pending" && (
+
+
+              {/* Status: pending - só aparece se aceito pelo usuário atual */}
+              {budget.status === "pending" && isAcceptedByCurrentUser() && (
                 <>
                   {budget.startDate && Array.isArray(budget.technologies) && budget.technologies.length > 0 ? (
                     <Button variant="outline" size="sm" onClick={() => setIsApproveDialogOpen(true)}>
@@ -826,24 +926,25 @@ export default function OrcamentoDetalhesPage() {
                       <span>Configure a <strong>Data de Início</strong> e <strong>Tecnologias</strong> para enviar</span>
                     </div>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => {
-                    const budgetValue = budget.finalValue || 0;
-                    setEditFinalValue(budgetValue.toString());
-                    setFormattedBudget(formatCurrency(budgetValue));
-                    setEditTimeline(budget.timeline || "");
-                    setEditTechnologies(Array.isArray(budget.technologies) ? budget.technologies : []);
-                    // Formatar data de início se existir (YYYY-MM-DD)
-                    if (budget.startDate) {
-                      const d = new Date(budget.startDate);
-                      const year = d.getFullYear();
-                      const month = String(d.getMonth() + 1).padStart(2, "0");
-                      const day = String(d.getDate()).padStart(2, "0");
-                      setEditStartDate(`${year}-${month}-${day}`);
-                    } else {
-                      setEditStartDate("");
-                    }
-                    setIsEditValueDialogOpen(true);
-                  }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const budgetValue = budget.finalValue || budget.estimatedMin || 0;
+                      setEditFinalValue(budgetValue.toString());
+                      setEditTimeline(budget.timeline || "");
+                      if (budget.startDate) {
+                        const d = new Date(budget.startDate);
+                        const year = d.getFullYear();
+                        const month = String(d.getMonth() + 1).padStart(2, "0");
+                        const day = String(d.getDate()).padStart(2, "0");
+                        setEditStartDate(`${year}-${month}-${day}`);
+                      } else {
+                        setEditStartDate("");
+                      }
+                      setIsEditValueDialogOpen(true);
+                    }}
+                  >
                     <Edit2 className="h-4 w-4 mr-1" />Alterar Valor/Prazo
                   </Button>
                   <Button variant="destructive" size="sm" onClick={() => setIsDeleteDialogOpen(true)}>
@@ -852,8 +953,8 @@ export default function OrcamentoDetalhesPage() {
                 </>
               )}
 
-              {/* Status: sent */}
-              {budget.status === "sent" && (
+              {/* Status: sent - só aparece se aceito pelo usuário atual */}
+              {budget.status === "sent" && isAcceptedByCurrentUser() && (
                 <>
                   <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
                     <Edit2 className="h-4 w-4 mr-1" />Alterar
@@ -864,15 +965,15 @@ export default function OrcamentoDetalhesPage() {
                 </>
               )}
 
-              {/* Status: accepted / user_approved */}
-              {(budget.status === "accepted" || budget.status === "user_approved") && !budget.contract && (
+              {/* Status: accepted / user_approved - só aparece se aceito pelo usuário atual */}
+              {(budget.status === "accepted" || budget.status === "user_approved") && isAcceptedByCurrentUser() && !budget.contract && (
                 <Button variant="default" size="sm" onClick={() => router.push(`/dashboard/orcamentos/${params.id}/contrato`)}>
                   <FileSignature className="h-4 w-4 mr-1" />Criar Contrato
                 </Button>
               )}
 
-              {/* Status: contract_signed */}
-              {budget.status === "contract_signed" && (
+              {/* Status: contract_signed - só aparece se aceito pelo usuário atual */}
+              {budget.status === "contract_signed" && isAcceptedByCurrentUser() && (
                 <>
                   <Button variant="outline" size="sm" onClick={() => setIsViewContractDialogOpen(true)}>
                     <FileText className="h-4 w-4 mr-1" />
@@ -909,8 +1010,8 @@ export default function OrcamentoDetalhesPage() {
                 </>
               )}
 
-              {/* Status: down_payment_paid */}
-              {budget.status === "down_payment_paid" && (
+              {/* Status: down_payment_paid - Só aparece se aceito pelo usuário atual */}
+              {budget.status === "down_payment_paid" && isAcceptedByCurrentUser() && (
                 <>
                   {budget.projectId ? (
                     <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/projetos/${budget.projectId}`)}>
@@ -929,8 +1030,8 @@ export default function OrcamentoDetalhesPage() {
                 </>
               )}
 
-              {/* Status: completed */}
-              {budget.status === "completed" && budget.projectId && (
+              {/* Status: completed - Só aparece se aceito pelo usuário atual */}
+              {budget.status === "completed" && isAcceptedByCurrentUser() && budget.projectId && (
                 <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/projetos/${budget.projectId}`)}>
                   <FileText className="h-4 w-4 mr-1" />Ver Projeto Concluído
                 </Button>
@@ -1378,10 +1479,14 @@ export default function OrcamentoDetalhesPage() {
                 <CardTitle>Ações Rápidas</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" onClick={() => window.open(`mailto:${budget.clientEmail}`, "_blank")}>
-                  <Mail className="h-4 w-4 mr-2" />Enviar Email
-                </Button>
-                {budget.clientPhone && (
+                {/* Enviar Email - Só aparece se aceito pelo usuário atual */}
+                {isAcceptedByCurrentUser() && (
+                  <Button variant="outline" className="w-full justify-start" onClick={() => window.open(`mailto:${budget.clientEmail}`, "_blank")}>
+                    <Mail className="h-4 w-4 mr-2" />Enviar Email
+                  </Button>
+                )}
+                {/* WhatsApp - Só aparece se aceito pelo usuário atual */}
+                {isAcceptedByCurrentUser() && budget.clientPhone && (
                   <Button variant="outline" className="w-full justify-start" onClick={() => window.open(`https://wa.me/55${budget.clientPhone?.replace(/\D/g, "")}`, "_blank")}>
                     <Phone className="h-4 w-4 mr-2" />WhatsApp
                   </Button>
@@ -1476,8 +1581,71 @@ export default function OrcamentoDetalhesPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {/* Enviar Proposta Novamente */}
-                {budget.approvalToken && (
+                {/* Iniciar Orçamento (Aceitar/Recusar) - Apenas ADMIN ou Gerente de Projetos, e apenas se ninguém aceitou ainda */}
+                {budget?.status === "pending" && !budget.acceptedBy && currentUser && (
+                  currentUser.role === "ADMIN" ||
+                  (currentUser.role === "TEAM_MEMBER" && currentUser.teamRole === "Gerente de Projetos")
+                ) && (
+                    <>
+                      <Button
+                        variant="default"
+                        className="w-full justify-start gap-2 h-auto py-3 bg-green-600 hover:bg-green-700"
+                        onClick={() => {
+                          setAcceptAction("accept");
+                          setIsAcceptDialogOpen(true);
+                        }}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <div className="text-left">
+                          <p className="text-sm font-medium">Aceitar Orçamento</p>
+                          <p className="text-xs text-slate-50">Assumir responsabilidade pelo orçamento</p>
+                        </div>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start gap-2 h-auto py-3 border-red-200 hover:bg-red-50"
+                        onClick={() => {
+                          setAcceptAction("decline");
+                          setIsAcceptDialogOpen(true);
+                        }}
+                      >
+                        <X className="h-4 w-4 text-red-600" />
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-red-600">Recusar Orçamento</p>
+                          <p className="text-xs text-slate-500">Recusar responsabilidade</p>
+                        </div>
+                      </Button>
+                    </>
+                  )}
+
+                {/* Status para usuários sem permissão */}
+                {budget?.status === "pending" && !budget.acceptedBy && currentUser && !(
+                  currentUser.role === "ADMIN" ||
+                  (currentUser.role === "TEAM_MEMBER" && currentUser.teamRole === "Gerente de Projetos")
+                ) && (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⏳ Aguardando aceite de um Gerente de Projetos ou Admin
+                      </p>
+                    </div>
+                  )}
+
+                {/* Mostrar quem aceitou */}
+                {budget.acceptedBy && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800 font-medium">
+                      ✓ Aceito por {budget.acceptedByUser?.name || "Membro da equipe"}
+                    </p>
+                    {budget.acceptedAt && (
+                      <p className="text-xs text-green-600 mt-1">
+                        em {new Date(budget.acceptedAt).toLocaleDateString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Enviar Proposta Novamente - Só aparece se aceito pelo usuário atual */}
+                {budget.approvalToken && isAcceptedByCurrentUser() && (
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
@@ -1494,8 +1662,8 @@ export default function OrcamentoDetalhesPage() {
                   </Button>
                 )}
 
-                {/* Reenviar Contrato */}
-                {budget.contract && (
+                {/* Reenviar Contrato - Só aparece se aceito pelo usuário atual */}
+                {budget.contract && isAcceptedByCurrentUser() && (
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
@@ -1509,8 +1677,8 @@ export default function OrcamentoDetalhesPage() {
                   </Button>
                 )}
 
-                {/* Enviar Link de Pagamento */}
-                {budget.contract?.confirmed && budget.status !== 'down_payment_paid' && (
+                {/* Enviar Link de Pagamento - Só aparece se aceito pelo usuário atual */}
+                {budget.contract?.confirmed && budget.status !== 'down_payment_paid' && isAcceptedByCurrentUser() && (
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
@@ -1524,8 +1692,8 @@ export default function OrcamentoDetalhesPage() {
                   </Button>
                 )}
 
-                {/* Iniciar Projeto */}
-                {budget.status === 'down_payment_paid' && !budget.projectId && (
+                {/* Iniciar Projeto - Só aparece se aceito pelo usuário atual */}
+                {budget.status === 'down_payment_paid' && !budget.projectId && isAcceptedByCurrentUser() && (
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
@@ -1539,8 +1707,8 @@ export default function OrcamentoDetalhesPage() {
                   </Button>
                 )}
 
-                {/* Ver Projeto */}
-                {budget.projectId && (
+                {/* Ver Projeto - Só aparece se aceito pelo usuário atual */}
+                {budget.projectId && isAcceptedByCurrentUser() && (
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
@@ -1554,34 +1722,36 @@ export default function OrcamentoDetalhesPage() {
                   </Button>
                 )}
 
-                {/* Editar Valor/Prazo */}
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-2 h-auto py-3"
-                  onClick={() => {
-                    const budgetValue = budget.finalValue || 0;
-                    setEditFinalValue(budgetValue.toString());
-                    setFormattedBudget(formatCurrency(budgetValue));
-                    setEditTimeline(budget.timeline || "");
-                    setEditTechnologies(Array.isArray(budget.technologies) ? budget.technologies : []);
-                    if (budget.startDate) {
-                      const d = new Date(budget.startDate);
-                      const year = d.getFullYear();
-                      const month = String(d.getMonth() + 1).padStart(2, "0");
-                      const day = String(d.getDate()).padStart(2, "0");
-                      setEditStartDate(`${year}-${month}-${day}`);
-                    } else {
-                      setEditStartDate("");
-                    }
-                    setIsEditValueDialogOpen(true);
-                  }}
-                >
-                  <Edit2 className="h-4 w-4 text-orange-600" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium">Editar Valor/Prazo</p>
-                    <p className="text-xs text-slate-500">Atualizar valor final ou prazo de entrega</p>
-                  </div>
-                </Button>
+                {/* Editar Valor/Prazo - Só aparece se aceito pelo usuário atual */}
+                {budget.status === "pending" && isAcceptedByCurrentUser() && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 h-auto py-3"
+                    onClick={() => {
+                      const budgetValue = budget.finalValue || 0;
+                      setEditFinalValue(budgetValue.toString());
+                      setFormattedBudget(formatCurrency(budgetValue));
+                      setEditTimeline(budget.timeline || "");
+                      setEditTechnologies(Array.isArray(budget.technologies) ? budget.technologies : []);
+                      if (budget.startDate) {
+                        const d = new Date(budget.startDate);
+                        const year = d.getFullYear();
+                        const month = String(d.getMonth() + 1).padStart(2, "0");
+                        const day = String(d.getDate()).padStart(2, "0");
+                        setEditStartDate(`${year}-${month}-${day}`);
+                      } else {
+                        setEditStartDate("");
+                      }
+                      setIsEditValueDialogOpen(true);
+                    }}
+                  >
+                    <Edit2 className="h-4 w-4 text-orange-600" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Editar Valor/Prazo</p>
+                      <p className="text-xs text-slate-500">Atualizar valor final ou prazo de entrega</p>
+                    </div>
+                  </Button>
+                )}
 
                 {/* Duplicar Orçamento */}
                 <Button
@@ -2171,6 +2341,96 @@ export default function OrcamentoDetalhesPage() {
             </div>
             <DialogFooter>
               <Button onClick={() => setIsPaymentLinkDialogOpen(false)}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Aceitar/Recusar Orçamento */}
+        <Dialog open={isAcceptDialogOpen} onOpenChange={setIsAcceptDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {acceptAction === "accept" ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    Aceitar Orçamento
+                  </>
+                ) : (
+                  <>
+                    <X className="h-5 w-5 text-red-600" />
+                    Recusar Orçamento
+                  </>
+                )}
+              </DialogTitle>
+              <DialogDescription>
+                {acceptAction === "accept"
+                  ? "Ao aceitar este orçamento, você assume a responsabilidade de gerenciá-lo até a conclusão."
+                  : "Ao recusar, o orçamento permanecerá pendente e poderá ser aceito por outro membro da equipe."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {acceptAction === "decline" && (
+                <div className="space-y-2">
+                  <Label>Motivo da recusa (opcional)</Label>
+                  <Textarea
+                    placeholder="Informe o motivo da recusa..."
+                    value={declineReason}
+                    onChange={(e) => setDeclineReason(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {acceptAction === "accept" && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800 font-medium">
+                    ✓ Você será o responsável por este orçamento
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Somente você poderá alterar valor, prazo e outras configurações
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAcceptDialogOpen(false);
+                  setDeclineReason("");
+                }}
+                disabled={isAccepting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant={acceptAction === "accept" ? "default" : "destructive"}
+                onClick={handleAcceptBudget}
+                disabled={isAccepting}
+              >
+                {isAccepting ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    {acceptAction === "accept" ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Aceitar
+                      </>
+                    ) : (
+                      <>
+                        <X className="h-4 w-4 mr-2" />
+                        Recusar
+                      </>
+                    )}
+                  </>
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

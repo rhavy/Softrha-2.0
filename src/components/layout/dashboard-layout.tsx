@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,20 +19,49 @@ import {
   DollarSign,
   Bell,
   BarChart3,
+  Star,
 } from "lucide-react";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const navItems = [
+interface NavItem {
+  icon: any;
+  label: string;
+  href: string;
+  allowedRoles?: string[];
+}
+
+const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
   { icon: BarChart3, label: "Relatórios", href: "/dashboard/relatorios" },
-  { icon: Users, label: "Clientes", href: "/dashboard/clientes" },
-  { icon: DollarSign, label: "Orçamentos", href: "/dashboard/orcamentos" },
+  { 
+    icon: Star, 
+    label: "Avaliações", 
+    href: "/dashboard/avaliacoes",
+    allowedRoles: ["ADMIN"]
+  },
+  { 
+    icon: Users, 
+    label: "Clientes", 
+    href: "/dashboard/clientes",
+    allowedRoles: ["ADMIN"]
+  },
+  { 
+    icon: DollarSign, 
+    label: "Orçamentos", 
+    href: "/dashboard/orcamentos",
+    allowedRoles: ["ADMIN", "TEAM_MEMBER_GERENTE"]
+  },
   { icon: FolderKanban, label: "Projetos", href: "/dashboard/projetos" },
   { icon: Bell, label: "Notificações", href: "/dashboard/notificacoes" },
-  { icon: Users, label: "Equipe", href: "/dashboard/equipe" },
+  { 
+    icon: Users, 
+    label: "Equipe", 
+    href: "/dashboard/equipe",
+    allowedRoles: ["ADMIN"]
+  },
   { icon: FileText, label: "Documentos", href: "/dashboard/documentos" },
   { icon: Calendar, label: "Calendário", href: "/dashboard/calendario" },
   { icon: Settings, label: "Configurações", href: "/dashboard/configuracoes" },
@@ -40,8 +69,47 @@ const navItems = [
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
-  
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUser(data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuário atual:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Verificar se usuário pode acessar item de menu
+  const canAccessNavItem = (item: NavItem) => {
+    if (!item.allowedRoles) return true;
+    if (!currentUser) return false;
+    
+    // ADMIN tem acesso a tudo
+    if (currentUser.role === "ADMIN") return true;
+    
+    // TEAM_MEMBER com cargo "Gerente de Projetos" tem acesso a Orçamentos
+    if (item.allowedRoles.includes("TEAM_MEMBER_GERENTE") && 
+        currentUser.role === "TEAM_MEMBER" && 
+        currentUser.teamRole === "Gerente de Projetos") {
+      return true;
+    }
+    
+    // Outros TEAM_MEMBER e USER não têm acesso a páginas restritas
+    return false;
+  };
+
   // Verificação contínua de emailVerified (a cada 5 segundos)
   useEmailVerification();
 
@@ -65,7 +133,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </button>
 
             <nav className="flex-1 space-y-1 p-4">
-              {navItems.map((item) => (
+              {!isLoading && navItems.filter(canAccessNavItem).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

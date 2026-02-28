@@ -31,9 +31,7 @@ export function Header() {
               transition={{ duration: 0.3 }}
               className="flex items-center gap-2"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-lg font-bold text-primary-foreground">S</span>
-              </div>
+              <img src="/logo.png" alt="SoftRha" className="h-8 w-auto" />
               <span className="text-xl font-bold text-foreground">SoftRha</span>
             </motion.div>
           </Link>

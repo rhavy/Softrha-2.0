@@ -37,6 +37,32 @@ export async function POST(request: NextRequest) {
       ? `${firstName} ${lastName}`
       : name || "Cliente não informado";
 
+    // Buscar cliente para obter email e telefone
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { emails: true, phones: true },
+    });
+
+    // Parse dos emails e phones do cliente (armazenados como JSON string)
+    let clientEmail = email;
+    let clientPhone = phone;
+
+    if (client) {
+      try {
+        const emails = client.emails ? JSON.parse(client.emails) : [];
+        const phones = client.phones ? JSON.parse(client.phones) : [];
+        
+        if (!clientEmail && emails.length > 0) {
+          clientEmail = emails[0].value;
+        }
+        if (!clientPhone && phones.length > 0) {
+          clientPhone = phones[0].value;
+        }
+      } catch (e) {
+        console.error("Erro ao parsear emails/phones do cliente:", e);
+      }
+    }
+
     // Mapear tipos do formulário para o banco
     const timelineMap: Record<string, string> = {
       urgente: "urgent",
@@ -88,8 +114,8 @@ export async function POST(request: NextRequest) {
         estimatedMax: estimatedMax || 0,
         finalValue: finalValue || 0,
         clientName: clientName,
-        clientEmail: email,
-        clientPhone: phone,
+        clientEmail: clientEmail || "email@nao-informado.com",
+        clientPhone: clientPhone,
         company: company || "",
         details: details || "",
         approvalToken,

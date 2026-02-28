@@ -41,10 +41,15 @@ import {
   Globe,
   Edit3,
   History,
+  Plus,
+  X,
+  Star,
+  ArrowRight,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useParams } from "next/navigation";
+import { hasToastBeenShown, markToastAsShown } from "@/lib/toast-dedup";
 import {
   Dialog,
   DialogContent,
@@ -173,12 +178,33 @@ export default function ProjetoDetalhesPage() {
   const [urlChangeReason, setUrlChangeReason] = useState<string>("");
   const [urlChangeDescription, setUrlChangeDescription] = useState("");
   const [isUpdatingUrl, setIsUpdatingUrl] = useState(false);
+
+  // Estados para equipe do projeto
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState("");
+  const [selectedProjectRoles, setSelectedProjectRoles] = useState<string[]>([]);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  // Estados para avaliação de membros
+  const [isEvaluationModalOpen, setIsEvaluationModalOpen] = useState(false);
+  const [membersToEvaluate, setMembersToEvaluate] = useState<any[]>([]);
+  const [currentMemberIndex, setCurrentMemberIndex] = useState(0);
+  const [evaluationRatings, setEvaluationRatings] = useState({ rating: 0, participation: 0, quality: 0, comment: "" });
+  const [hasEvaluated, setHasEvaluated] = useState(false);
+  
+  // Estados para avaliação de cliente
+  const [isClientEvaluationModalOpen, setIsClientEvaluationModalOpen] = useState(false);
+  const [clientEvaluationRatings, setClientEvaluationRatings] = useState({ rating: 0, participation: 0, quality: 0, comment: "" });
+  const [hasClientEvaluated, setHasClientEvaluated] = useState(false);
   
   // Estados para histórico de URL
   const [urlHistory, setUrlHistory] = useState<any[]>([]);
   const [isUrlHistoryDialogOpen, setIsUrlHistoryDialogOpen] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-
+  
   // Mapear motivos técnicos para texto legível
   const getReasonLabel = (reason: string) => {
     const reasonMap: Record<string, string> = {
@@ -209,8 +235,26 @@ export default function ProjetoDetalhesPage() {
   useEffect(() => {
     if (params.id) {
       fetchProject();
+      fetchCurrentUser();
     }
   }, [params.id]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUser(data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuário atual:", error);
+    }
+  };
+
+  const isAcceptedByCurrentUser = () => {
+    if (!currentUser || !budget) return false;
+    return budget.acceptedBy === currentUser.id;
+  };
 
   const fetchProject = async () => {
     try {
@@ -260,6 +304,22 @@ export default function ProjetoDetalhesPage() {
 
       // Buscar agendamento sempre (não apenas quando completed)
       fetchSchedule();
+
+      // Buscar equipe do projeto
+      fetchTeam();
+      
+      // Verificar se projeto está finalizado e mostrar modal de avaliação
+      if (data.status === "completed" || data.status === "finished") {
+        const evaluated = localStorage.getItem(`project_${params.id}_evaluated`);
+        if (!evaluated && teamMembers.length > 0) {
+          // Agendar abertura do modal após 1.5 segundos
+          setTimeout(() => {
+            setIsEvaluationModalOpen(true);
+          }, 1500);
+        } else if (evaluated) {
+          setHasEvaluated(true);
+        }
+      }
     } catch (error) {
       toast({
         title: "Erro",
@@ -270,6 +330,244 @@ export default function ProjetoDetalhesPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Funções para gerenciar equipe
+  const fetchTeam = async () => {
+    try {
+      const response = await fetch(`/api/projetos/${params.id}/equipe`);
+      if (response.ok) {
+        const data = await response.json();
+        setTeamMembers(data.team || []);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar equipe:", error);
+    }
+  };
+
+  const fetchAvailableUsers = async (search?: string) => {
+    try {
+      const queryParams = search ? `?search=${encodeURIComponent(search)}` : "";
+      const response = await fetch(`/api/equipe/usuarios-disponiveis${queryParams}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableUsers(data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuários disponíveis:", error);
+    }
+  };
+
+  const handleAddTeamMember = async () => {
+    if (!selectedUser) {
+      toast({
+        title: "Selecione um usuário",
+        description: "Escolha um usuário para adicionar à equipe",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedProjectRoles.length === 0) {
+      toast({
+        title: "Selecione pelo menos uma área",
+        description: "Escolha uma ou mais áreas de atuação do membro no projeto",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoadingTeam(true);
+      const response = await fetch(`/api/projetos/${params.id}/equipe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: selectedUser, projectRoles: selectedProjectRoles }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      toast({
+        title: "Membro adicionado!",
+        description: data.message || "Usuário adicionado à equipe do projeto",
+        variant: "success",
+      });
+
+      setTeamMembers(data.team);
+      setIsTeamModalOpen(false);
+      setSelectedUser("");
+      setSelectedProjectRoles([]);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao adicionar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingTeam(false);
+    }
+  };
+
+  const toggleProjectRole = (role: string) => {
+    setSelectedProjectRoles((prev) =>
+      prev.includes(role)
+        ? prev.filter((r) => r !== role)
+        : [...prev, role]
+    );
+  };
+
+  const handleRemoveTeamMember = async (userId: string) => {
+    try {
+      setIsLoadingTeam(true);
+      const response = await fetch(`/api/projetos/${params.id}/equipe`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      toast({
+        title: "Membro removido!",
+        description: "Usuário removido da equipe do projeto",
+        variant: "success",
+      });
+
+      setTeamMembers(data.team);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao remover",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingTeam(false);
+    }
+  };
+
+  const fetchMembersToEvaluate = async () => {
+    try {
+      const response = await fetch(`/api/projetos/${params.id}/avaliar-membros`);
+      if (response.ok) {
+        const data = await response.json();
+        setMembersToEvaluate(data.teamMembers.filter((m: any) => !m.evaluated));
+        setHasEvaluated(data.allEvaluated);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar membros para avaliar:", error);
+    }
+  };
+
+  const handleSubmitEvaluation = async () => {
+    try {
+      const member = membersToEvaluate[currentMemberIndex];
+      const response = await fetch(`/api/projetos/${params.id}/avaliar-membros`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: member.id,
+          rating: evaluationRatings.rating,
+          participation: evaluationRatings.participation,
+          quality: evaluationRatings.quality,
+          comment: evaluationRatings.comment,
+        }),
+      });
+
+      if (response.ok) {
+        if (currentMemberIndex < membersToEvaluate.length - 1) {
+          setCurrentMemberIndex(currentMemberIndex + 1);
+          setEvaluationRatings({ rating: 0, participation: 0, quality: 0, comment: "" });
+          toast({
+            title: "Avaliação enviada!",
+            description: `${membersToEvaluate.length - currentMemberIndex - 1} membro(s) restante(s)`,
+          });
+        } else {
+          setIsEvaluationModalOpen(false);
+          setHasEvaluated(true);
+          toast({
+            title: "Todas avaliações enviadas!",
+            description: "Obrigado por avaliar a equipe do projeto.",
+            variant: "success",
+          });
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao avaliar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCheckClientEvaluation = async () => {
+    try {
+      const response = await fetch(`/api/projetos/${params.id}/avaliar-cliente`);
+      if (response.ok) {
+        const data = await response.json();
+        setHasClientEvaluated(data.hasEvaluated);
+        if (data.hasEvaluated && data.evaluation) {
+          setClientEvaluationRatings({
+            rating: data.evaluation.rating,
+            participation: data.evaluation.participation,
+            quality: data.evaluation.quality,
+            comment: data.evaluation.comment || "",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao verificar avaliação:", error);
+    }
+  };
+
+  const handleSubmitClientEvaluation = async () => {
+    if (!clientEvaluationRatings.rating || !clientEvaluationRatings.participation || !clientEvaluationRatings.quality) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha todas as avaliações (1-5 estrelas).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projetos/${params.id}/avaliar-cliente`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rating: clientEvaluationRatings.rating,
+          participation: clientEvaluationRatings.participation,
+          quality: clientEvaluationRatings.quality,
+          comment: clientEvaluationRatings.comment,
+        }),
+      });
+
+      if (response.ok) {
+        setIsClientEvaluationModalOpen(false);
+        setHasClientEvaluated(true);
+        toast({
+          title: "Avaliação enviada!",
+          description: "Obrigado por avaliar o projeto.",
+          variant: "success",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao avaliar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const canManageTeam = () => {
+    if (!currentUser) return false;
+    return (
+      currentUser.role === "ADMIN" ||
+      (currentUser.role === "TEAM_MEMBER" && currentUser.teamRole === "Gerente de Projetos")
+    );
   };
 
   const fetchSchedule = async () => {
@@ -360,15 +658,25 @@ export default function ProjetoDetalhesPage() {
       if (result.paymentLink) {
         setPaymentLink(result.paymentLink);
         setPayment(result.payment);
-        toast({
-          title: "Link de pagamento gerado!",
-          description: `Link de R$ ${result.payment.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} criado com sucesso.`,
-        });
+        
+        // Verificar se toast já foi exibido
+        const toastId = `payment-link-generated-${params.id}`;
+        if (!hasToastBeenShown(toastId)) {
+          markToastAsShown(toastId);
+          toast({
+            title: "Link de pagamento gerado!",
+            description: `Link de R$ ${result.payment.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} criado com sucesso.`,
+          });
+        }
       } else {
-        toast({
-          title: "Pagamento já realizado!",
-          description: "O cliente já realizou o pagamento da entrada.",
-        });
+        const toastId = `payment-already-done-${params.id}`;
+        if (!hasToastBeenShown(toastId)) {
+          markToastAsShown(toastId);
+          toast({
+            title: "Pagamento já realizado!",
+            description: "O cliente já realizou o pagamento da entrada.",
+          });
+        }
       }
     } catch (error) {
       console.error("Erro ao gerar link de pagamento:", error);
@@ -631,7 +939,7 @@ export default function ProjetoDetalhesPage() {
       } else if (sendEmail) {
         notifications.push("E-mail: serviço não configurado");
       }
-      
+
       if (result.whatsappUrl) {
         notifications.push("WhatsApp pronto");
         // Abrir WhatsApp em nova aba
@@ -640,10 +948,15 @@ export default function ProjetoDetalhesPage() {
         notifications.push("WhatsApp: telefone não disponível");
       }
 
-      toast({
-        title: "Pagamento final processado!",
-        description: notifications.join(" • "),
-      });
+      // Verificar se toast já foi exibido
+      const toastId = `final-payment-processed-${params.id}`;
+      if (!hasToastBeenShown(toastId)) {
+        markToastAsShown(toastId);
+        toast({
+          title: "Pagamento final processado!",
+          description: notifications.join(" • "),
+        });
+      }
 
       fetchProject();
     } catch (error) {
@@ -792,9 +1105,10 @@ export default function ProjetoDetalhesPage() {
                   Notificar Evolução
                 </Button>
               )}
-              {/* Botão Enviar Pagamento Final - aparece apenas se projeto 100% e ainda não foi pago */}
+              {/* Botão Enviar Pagamento Final - aparece apenas se aceito pelo usuário atual */}
               {project.progress === 100 &&
-                (project.status === "development_100" || project.status === "waiting_final_payment") && (
+                (project.status === "development_100" || project.status === "waiting_final_payment") &&
+                isAcceptedByCurrentUser() && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -820,7 +1134,8 @@ export default function ProjetoDetalhesPage() {
                   Agendar Entrega
                 </Button>
               )} */}
-              {isWaitingPayment && (
+              {/* Botão Gerar Pagamento - aparece apenas se aceito pelo usuário atual */}
+              {isWaitingPayment && isAcceptedByCurrentUser() && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1036,13 +1351,8 @@ export default function ProjetoDetalhesPage() {
                       <p className="text-sm font-medium truncate">
                         {(() => {
                           if (budget?.clientEmail) return budget.clientEmail;
-                          if (project.client?.emails) {
-                            try {
-                              const emails = JSON.parse(project.client.emails);
-                              return emails[0]?.value || 'Não disponível';
-                            } catch {
-                              return 'Não disponível';
-                            }
+                          if (project.client?.emails && Array.isArray(project.client.emails)) {
+                            return project.client.emails[0]?.value || 'Não disponível';
                           }
                           return 'Não disponível';
                         })()}
@@ -1053,7 +1363,7 @@ export default function ProjetoDetalhesPage() {
                       size="icon"
                       className="h-8 w-8 flex-shrink-0"
                       onClick={() => {
-                        const email = budget?.clientEmail || (project.client?.emails ? JSON.parse(project.client.emails)[0]?.value : '');
+                        const email = budget?.clientEmail || (project.client?.emails && Array.isArray(project.client.emails) ? project.client.emails[0]?.value : '');
                         if (email) {
                           navigator.clipboard.writeText(email);
                           toast({ title: "Copiado!", description: "E-mail copiado" });
@@ -1074,13 +1384,8 @@ export default function ProjetoDetalhesPage() {
                       <p className="text-sm font-medium truncate">
                         {(() => {
                           if (budget?.clientPhone) return budget.clientPhone;
-                          if (project.client?.phones) {
-                            try {
-                              const phones = JSON.parse(project.client.phones);
-                              return phones[0]?.value || 'Não disponível';
-                            } catch {
-                              return 'Não disponível';
-                            }
+                          if (project.client?.phones && Array.isArray(project.client.phones)) {
+                            return project.client.phones[0]?.value || 'Não disponível';
                           }
                           return 'Não disponível';
                         })()}
@@ -1091,7 +1396,7 @@ export default function ProjetoDetalhesPage() {
                       size="icon"
                       className="h-8 w-8 flex-shrink-0"
                       onClick={() => {
-                        const phone = budget?.clientPhone || (project.client?.phones ? JSON.parse(project.client.phones)[0]?.value : '');
+                        const phone = budget?.clientPhone || (project.client?.phones && Array.isArray(project.client.phones) ? project.client.phones[0]?.value : '');
                         if (phone) {
                           navigator.clipboard.writeText(phone);
                           toast({ title: "Copiado!", description: "Telefone copiado" });
@@ -1388,6 +1693,87 @@ export default function ProjetoDetalhesPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Card de Avaliação da Equipe */}
+            {(project?.status === "completed" || project?.status === "finished") && (
+              <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/10">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                    <CardTitle>Avaliação da Equipe</CardTitle>
+                  </div>
+                  <CardDescription>
+                    O projeto foi finalizado! Avalie o desempenho da equipe.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {hasEvaluated ? (
+                    <div className="text-center py-2">
+                      <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                      <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                        Avaliação realizada com sucesso!
+                      </p>
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      onClick={() => router.push(`/dashboard/projetos/${params.id}/avaliacao`)}
+                    >
+                      <Star className="h-4 w-4 mr-2" />
+                      Avaliar Equipe
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Avaliação do Cliente */}
+            <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/10">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-purple-500 fill-purple-500" />
+                  <CardTitle>Avaliação do Cliente</CardTitle>
+                </div>
+                <CardDescription>
+                  Avalie sua experiência com o projeto
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {hasClientEvaluated ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle2 className="h-5 w-5" />
+                      <p className="text-sm font-medium">Avaliação enviada!</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-purple-100 dark:bg-purple-900 rounded p-2">
+                        <p className="text-xs text-muted-foreground">Geral</p>
+                        <p className="text-lg font-bold text-purple-600">{clientEvaluationRatings.rating}/5</p>
+                      </div>
+                      <div className="bg-purple-100 dark:bg-purple-900 rounded p-2">
+                        <p className="text-xs text-muted-foreground">Participação</p>
+                        <p className="text-lg font-bold text-purple-600">{clientEvaluationRatings.participation}/5</p>
+                      </div>
+                      <div className="bg-purple-100 dark:bg-purple-900 rounded p-2">
+                        <p className="text-xs text-muted-foreground">Qualidade</p>
+                        <p className="text-lg font-bold text-purple-600">{clientEvaluationRatings.quality}/5</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      handleCheckClientEvaluation();
+                      setIsClientEvaluationModalOpen(true);
+                    }}
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    Avaliar Projeto
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Timeline */}
             <Card>
               <CardHeader>
@@ -1435,6 +1821,110 @@ export default function ProjetoDetalhesPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Equipe do Projeto */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Equipe
+                  </CardTitle>
+                  {canManageTeam() && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        fetchAvailableUsers();
+                        setIsTeamModalOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <CardDescription>
+                  {teamMembers.length === 0
+                    ? "Nenhum membro na equipe"
+                    : `${teamMembers.length} membro${teamMembers.length > 1 ? "s" : ""}`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {teamMembers.length > 0 ? (
+                  <div className="space-y-3">
+                    {teamMembers.map((member, index) => (
+                      <div
+                        key={`${member.id || 'member'}-${index}`}
+                        className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{member.name || member.email}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(member.projectRoles || [member.projectRole]).map((role: string, idx: number) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {role}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        {canManageTeam() && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemoveTeamMember(member.id)}
+                            disabled={isLoadingTeam}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {canManageTeam()
+                      ? "Clique no + para adicionar membros"
+                      : "Somente o Gerente de Projetos pode adicionar membros"}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Avaliar Equipe do Projeto */}
+            {!hasEvaluated && teamMembers.length > 1 && (
+              <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/10">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                    <CardTitle>Avaliar Equipe</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Avalie os membros da equipe do projeto
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      fetchMembersToEvaluate();
+                      setIsEvaluationModalOpen(true);
+                      setCurrentMemberIndex(0);
+                    }}
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    Iniciar Avaliação
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    Avaliação única e confidencial
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Status dos Pagamentos */}
             {(payment || finalPayment) && (
@@ -2034,7 +2524,7 @@ export default function ProjetoDetalhesPage() {
                 </p>
               </div>
 
-              {paymentLink ? (
+              {paymentLink && isAcceptedByCurrentUser() ? (
                 <div className="space-y-3">
                   <div className="bg-muted rounded-md p-3 break-all">
                     <p className="text-xs font-mono text-muted-foreground">
@@ -2059,6 +2549,12 @@ export default function ProjetoDetalhesPage() {
                     O projeto será liberado automaticamente após a confirmação do pagamento.
                   </p>
                 </div>
+              ) : paymentLink ? (
+                <div className="text-center py-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    🔒 Apenas o responsável pelo orçamento pode gerenciar o link de pagamento.
+                  </p>
+                </div>
               ) : (
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground mb-4">
@@ -2077,7 +2573,7 @@ export default function ProjetoDetalhesPage() {
               >
                 Fechar
               </Button>
-              {!paymentLink && (
+              {!paymentLink && isAcceptedByCurrentUser() && (
                 <Button
                   onClick={handleGeneratePaymentLink}
                   disabled={isGeneratingPaymentLink}
@@ -2095,6 +2591,11 @@ export default function ProjetoDetalhesPage() {
                     </>
                   )}
                 </Button>
+              )}
+              {!paymentLink && !isAcceptedByCurrentUser() && (
+                <div className="text-center py-2 text-sm text-muted-foreground bg-muted/50 rounded-lg">
+                  🔒 Apenas o responsável pelo orçamento pode gerar o link de pagamento.
+                </div>
               )}
             </DialogFooter>
           </DialogContent>
@@ -2380,7 +2881,7 @@ export default function ProjetoDetalhesPage() {
                 </p>
               </div>
 
-              {finalPaymentLink ? (
+              {finalPaymentLink && isAcceptedByCurrentUser() ? (
                 <div className="space-y-3">
                   <div className="bg-muted rounded-md p-3 break-all">
                     <p className="text-xs font-mono text-muted-foreground">
@@ -2397,8 +2898,8 @@ export default function ProjetoDetalhesPage() {
                       Abrir Link
                     </Button>
                   </div>
-                  
-                  {/* Botões de Envio Direto */}
+
+                  {/* Botões de Envio Direto - Apenas para quem aceitou */}
                   <div className="space-y-2 pt-2">
                     <p className="text-sm font-semibold">Enviar por:</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -2512,7 +3013,7 @@ export default function ProjetoDetalhesPage() {
               >
                 Fechar
               </Button>
-              {!finalPaymentLink && (
+              {!finalPaymentLink && isAcceptedByCurrentUser() && (
                 <Button
                   onClick={handleSendFinalPayment}
                   disabled={isSendingFinalPayment || (!sendEmail && !sendWhatsApp)}
@@ -2530,6 +3031,11 @@ export default function ProjetoDetalhesPage() {
                     </>
                   )}
                 </Button>
+              )}
+              {!finalPaymentLink && !isAcceptedByCurrentUser() && (
+                <div className="text-center py-2 text-sm text-muted-foreground bg-muted/50 rounded-lg">
+                  🔒 Apenas o responsável pelo orçamento pode enviar o pagamento final.
+                </div>
               )}
             </DialogFooter>
           </DialogContent>
@@ -3129,6 +3635,439 @@ export default function ProjetoDetalhesPage() {
                 Fechar
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Adicionar Membro da Equipe */}
+        <Dialog open={isTeamModalOpen} onOpenChange={setIsTeamModalOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Adicionar Membro à Equipe
+              </DialogTitle>
+              <DialogDescription>
+                Selecione um usuário e defina suas áreas de atuação no projeto
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Buscar Usuário</Label>
+                <Input
+                  placeholder="Digite o nome ou email..."
+                  onChange={(e) => fetchAvailableUsers(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Usuários Disponíveis</Label>
+                <div className="max-h-[200px] overflow-y-auto space-y-2 border rounded-lg p-2">
+                  {availableUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Nenhum usuário encontrado
+                    </p>
+                  ) : (
+                    availableUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                          selectedUser === user.id
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted"
+                        }`}
+                        onClick={() => setSelectedUser(user.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {user.name || user.email}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {user.teamRole || "Membro"}
+                            </p>
+                          </div>
+                        </div>
+                        {selectedUser === user.id && (
+                          <CheckCircle2 className="h-5 w-5" />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Áreas de Atuação no Projeto (selecione uma ou mais)</Label>
+                <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto border rounded-lg p-3">
+                  {[
+                    "Desenvolvedor Frontend",
+                    "Desenvolvedor Backend",
+                    "Desenvolvedor Fullstack",
+                    "Designer UI/UX",
+                    "Gerente de Projetos",
+                    "Product Owner",
+                    "Scrum Master",
+                    "QA / Tester",
+                    "DevOps",
+                    "Arquiteto de Software",
+                    "Banco de Dados",
+                    "Segurança",
+                    "Suporte Técnico",
+                    "Outro",
+                  ].map((role) => (
+                    <div
+                      key={role}
+                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                        selectedProjectRoles.includes(role)
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
+                      }`}
+                      onClick={() => toggleProjectRole(role)}
+                    >
+                      <div
+                        className={`h-4 w-4 rounded border flex items-center justify-center ${
+                          selectedProjectRoles.includes(role)
+                            ? "bg-primary-foreground border-primary-foreground"
+                            : "border-muted-foreground"
+                        }`}
+                      >
+                        {selectedProjectRoles.includes(role) && (
+                          <CheckCircle2 className="h-3 w-3" />
+                        )}
+                      </div>
+                      <span className="text-xs">{role}</span>
+                    </div>
+                  ))}
+                </div>
+                {selectedProjectRoles.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedProjectRoles.map((role) => (
+                      <Badge key={role} variant="outline" className="text-xs">
+                        {role}
+                        <button
+                          onClick={() => toggleProjectRole(role)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsTeamModalOpen(false);
+                  setSelectedUser("");
+                  setSelectedProjectRoles([]);
+                }}
+                disabled={isLoadingTeam}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleAddTeamMember}
+                disabled={!selectedUser || selectedProjectRoles.length === 0 || isLoadingTeam}
+              >
+                {isLoadingTeam ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    Adicionando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar ({selectedProjectRoles.length})
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Avaliação de Membros da Equipe */}
+        <Dialog open={isEvaluationModalOpen} onOpenChange={setIsEvaluationModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                Avaliar Membro da Equipe
+              </DialogTitle>
+              <DialogDescription>
+                {membersToEvaluate.length > 0 && (
+                  <span>
+                    Membro {currentMemberIndex + 1} de {membersToEvaluate.length}
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {membersToEvaluate.length > 0 && (
+              <div className="space-y-6">
+                {/* Membro Atual */}
+                <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-lg">{membersToEvaluate[currentMemberIndex]?.name}</p>
+                    <p className="text-sm text-muted-foreground">{membersToEvaluate[currentMemberIndex]?.role}</p>
+                  </div>
+                </div>
+
+                {/* Perguntas de Avaliação */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-base font-semibold">
+                      Avaliação Geral (1-5 estrelas)
+                    </Label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setEvaluationRatings({ ...evaluationRatings, rating: star })}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Star
+                            className={`h-10 w-10 ${
+                              star <= evaluationRatings.rating
+                                ? "text-yellow-500 fill-yellow-500"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-base font-semibold">
+                      Participação no Projeto (1-5)
+                    </Label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setEvaluationRatings({ ...evaluationRatings, participation: star })}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Star
+                            className={`h-8 w-8 ${
+                              star <= evaluationRatings.participation
+                                ? "text-blue-500 fill-blue-500"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-base font-semibold">
+                      Qualidade do Trabalho (1-5)
+                    </Label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setEvaluationRatings({ ...evaluationRatings, quality: star })}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Star
+                            className={`h-8 w-8 ${
+                              star <= evaluationRatings.quality
+                                ? "text-green-500 fill-green-500"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Comentário (opcional)</Label>
+                    <Textarea
+                      placeholder="Deixe um comentário sobre o trabalho deste membro..."
+                      value={evaluationRatings.comment}
+                      onChange={(e) => setEvaluationRatings({ ...evaluationRatings, comment: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEvaluationModalOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleSubmitEvaluation}
+                    disabled={evaluationRatings.rating === 0 || evaluationRatings.participation === 0 || evaluationRatings.quality === 0}
+                  >
+                    {currentMemberIndex < membersToEvaluate.length - 1 ? (
+                      <>
+                        Próximo
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Finalizar Avaliações
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Avaliação do Cliente */}
+        <Dialog open={isClientEvaluationModalOpen} onOpenChange={setIsClientEvaluationModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-purple-500 fill-purple-500" />
+                Avaliar Projeto
+              </DialogTitle>
+              <DialogDescription>
+                Avalie sua experiência com este projeto
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              {/* Pergunta 1: Avaliação Geral */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">
+                  1. Avaliação Geral do Projeto (1-5 estrelas)
+                </Label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setClientEvaluationRatings({ ...clientEvaluationRatings, rating: star })}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-10 w-10 ${
+                          star <= clientEvaluationRatings.rating
+                            ? "text-yellow-500 fill-yellow-500"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {clientEvaluationRatings.rating > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Você avaliou com {clientEvaluationRatings.rating} de 5 estrelas
+                  </p>
+                )}
+              </div>
+
+              {/* Pergunta 2: Participação */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">
+                  2. Sua Participação no Projeto (1-5 estrelas)
+                </Label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setClientEvaluationRatings({ ...clientEvaluationRatings, participation: star })}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-8 w-8 ${
+                          star <= clientEvaluationRatings.participation
+                            ? "text-blue-500 fill-blue-500"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {clientEvaluationRatings.participation > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Participação: {clientEvaluationRatings.participation} de 5
+                  </p>
+                )}
+              </div>
+
+              {/* Pergunta 3: Qualidade */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">
+                  3. Qualidade do Trabalho Entregue (1-5 estrelas)
+                </Label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setClientEvaluationRatings({ ...clientEvaluationRatings, quality: star })}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-8 w-8 ${
+                          star <= clientEvaluationRatings.quality
+                            ? "text-green-500 fill-green-500"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {clientEvaluationRatings.quality > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Qualidade: {clientEvaluationRatings.quality} de 5
+                  </p>
+                )}
+              </div>
+
+              {/* Comentário */}
+              <div className="space-y-2">
+                <Label>Comentário (opcional)</Label>
+                <Textarea
+                  placeholder="Deixe um comentário sobre sua experiência com o projeto..."
+                  value={clientEvaluationRatings.comment}
+                  onChange={(e) => setClientEvaluationRatings({ ...clientEvaluationRatings, comment: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsClientEvaluationModalOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSubmitClientEvaluation}
+                  disabled={clientEvaluationRatings.rating === 0 || clientEvaluationRatings.participation === 0 || clientEvaluationRatings.quality === 0}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Enviar Avaliação
+                </Button>
+              </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       </motion.div>

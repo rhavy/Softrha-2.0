@@ -2,30 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
-// GET - Listar usuários disponíveis para serem membros da equipe
+// GET - Listar usuários disponíveis para equipe
 export async function GET(request: NextRequest) {
   try {
     const sessionData = await auth.api.getSession({ headers: request.headers });
 
     if (!sessionData?.session) {
-      return NextResponse.json(
-        { error: "Não autorizado" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
 
-    // Buscar usuários que NÃO são ADMIN e NÃO são TEAM_MEMBER
     const where: any = {
-      role: {
-        not: "ADMIN",
-      },
+      role: "TEAM_MEMBER", // Apenas TEAM_MEMBER
+      status: "active",
     };
-
-    // Se quiser buscar apenas usuários sem teamRole definido (ainda não são da equipe)
-    where.teamRole = null;
 
     if (search) {
       where.OR = [
@@ -40,7 +32,12 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         email: true,
+        teamRole: true,
+        phone: true,
+        avatar: true,
+        status: true,
         role: true,
+        skills: true,
       },
       orderBy: {
         name: "asc",
@@ -49,9 +46,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(users);
   } catch (error) {
-    console.error("Erro ao buscar usuários disponíveis:", error);
+    console.error("Erro ao buscar usuários:", error);
     return NextResponse.json(
-      { error: "Erro ao buscar usuários disponíveis" },
+      { error: "Erro ao buscar usuários" },
       { status: 500 }
     );
   }

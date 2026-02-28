@@ -29,6 +29,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRealTimeUpdates } from "@/hooks/use-real-time-updates";
 import { useRouter } from "next/navigation";
+import { hasToastBeenShown, markToastAsShown } from "@/lib/toast-dedup";
 
 interface Budget {
   id: string;
@@ -50,6 +51,14 @@ interface Budget {
   userId: string;
   createdAt: string;
   updatedAt: string;
+  acceptedBy?: string | null;
+  acceptedAt?: string | null;
+  acceptedByUser?: {
+    name?: string | null;
+  } | null;
+  user?: {
+    name?: string | null;
+  } | null;
 }
 
 const statusConfig: Record<string, { color: string; bg: string; border: string; icon: React.ReactNode; label: string }> = {
@@ -157,6 +166,7 @@ export default function OrcamentosPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const itemsPerPage = 10;
 
   // Hook de atualizações em tempo real
@@ -174,19 +184,38 @@ export default function OrcamentosPage() {
   });
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchBudgets();
-    
-    // Atualizar status a cada 5000ms (5 segundos)
-    const intervalId = setInterval(() => {
-      fetchBudgets();
-    }, 5000);
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUser(data);
+        
+        // Verificar permissão: ADMIN ou TEAM_MEMBER com cargo "Gerente de Projetos"
+        const canAccess = data.role === "ADMIN" || 
+          (data.role === "TEAM_MEMBER" && data.teamRole === "Gerente de Projetos");
+        
+        if (!canAccess) {
+          const toastId = "orcamentos-access-denied";
+          if (!hasToastBeenShown(toastId)) {
+            markToastAsShown(toastId);
+            toast({
+              title: "Acesso Restrito",
+              description: "Esta página é exclusiva para administradores e gerentes de projetos",
+              variant: "destructive",
+            });
+            setTimeout(() => router.push("/dashboard"), 2000);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuário atual:", error);
+    }
+  };
 
   const fetchBudgets = async () => {
     try {
@@ -258,6 +287,16 @@ export default function OrcamentosPage() {
     downPaymentPaid: budgets.filter((b) => b.status === "down_payment_paid").length,
     completed: budgets.filter((b) => b.status === "completed").length,
   };
+
+  if (isLoading || (currentUser && currentUser.role !== "ADMIN" && !(currentUser.role === "TEAM_MEMBER" && currentUser.teamRole === "Gerente de Projetos"))) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -465,9 +504,18 @@ export default function OrcamentosPage() {
                           </CardDescription>
                         </div>
                       </div>
-                      <Badge className={`${statusConfig[budget.status]?.color} ${statusConfig[budget.status]?.bg}`} variant="secondary">
-                        {statusConfig[budget.status]?.label}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${statusConfig[budget.status]?.color} ${statusConfig[budget.status]?.bg}`} variant="secondary">
+                          {statusConfig[budget.status]?.icon}
+                          <span className="ml-1">{statusConfig[budget.status]?.label}</span>
+                        </Badge>
+                        {budget.status === "pending" && budget.acceptedBy && (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            {budget.acceptedByUser?.name || "Aceito"}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

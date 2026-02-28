@@ -31,7 +31,18 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
-    return NextResponse.json(notifications);
+    // Contar não lidas
+    const unreadCount = await prisma.notification.count({
+      where: {
+        userId: session.userId,
+        read: false,
+      },
+    });
+
+    return NextResponse.json({
+      notifications,
+      unreadCount,
+    });
   } catch (error) {
     console.error("Erro ao buscar notificações:", error);
     return NextResponse.json(

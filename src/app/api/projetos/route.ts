@@ -41,6 +41,24 @@ export async function GET(request: NextRequest) {
             status: true,
           },
         },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        teamMembers: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -71,6 +89,13 @@ export async function GET(request: NextRequest) {
     const formattedProjects = projects.map((project: any) => {
       const completedTasks = project.tasks.filter((t: any) => t.status === "done").length;
       const techArray = project.tech ? JSON.parse(project.tech) : [];
+      
+      // Extrair membros da equipe
+      const teamMembers = project.teamMembers?.map((tm: any) => ({
+        id: tm.user.id,
+        name: tm.user.name,
+        email: tm.user.email,
+      })) || [];
 
       return {
         id: project.id,
@@ -85,9 +110,11 @@ export async function GET(request: NextRequest) {
           total: project.tasks.length,
           completed: completedTasks,
         },
-        team: [],
+        team: teamMembers,
         tech: techArray,
         description: project.description,
+        createdById: project.createdById,
+        createdBy: project.createdBy || null,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
