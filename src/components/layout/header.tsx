@@ -15,7 +15,6 @@ export function Header() {
     { href: "/", label: "Início" },
     { href: "/sobre", label: "Sobre" },
     { href: "/servicos", label: "Serviços" },
-    { href: "/projetos", label: "Projetos" },
     { href: "/orcamento", label: "Orçamento" },
     { href: "/contato", label: "Contato" },
   ];

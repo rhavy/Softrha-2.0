@@ -4,22 +4,41 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FuturisticBackground } from "@/components/ui/futuristic-background";
 import {
   Code2,
   Smartphone,
   Brain,
   Palette,
   Cloud,
-  Search,
   CheckCircle2,
   ArrowRight,
   Zap,
   Shield,
   Layers,
+  Sparkles,
+  Rocket,
+  Cpu,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
+import { Footer } from "@/components/layout/footer";
 
 export default function Servicos() {
+  const fadeInUp = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.5 },
+  };
+
+  const staggerContainer = {
+    animate: {
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
   const services = [
     {
       icon: Code2,
@@ -34,6 +53,7 @@ export default function Servicos() {
         "Performance Core Web Vitals",
       ],
       popular: true,
+      gradient: "from-blue-500 to-cyan-500",
     },
     {
       icon: Smartphone,
@@ -48,164 +68,196 @@ export default function Servicos() {
         "Offline-first",
       ],
       popular: false,
+      gradient: "from-purple-500 to-pink-500",
     },
     {
       icon: Brain,
       title: "Software Sob Medida",
-      description: "Sistemas personalizados para automatizar processos e otimizar operações do seu negócio.",
+      description: "Soluções personalizadas para automatizar e otimizar seus processos de negócio.",
       features: [
         "Arquitetura Escalável",
-        "APIs REST & GraphQL",
+        "APIs REST/GraphQL",
         "Integrações",
-        "Dashboard Analytics",
-        "Automação",
-        "Relatórios",
+        "Cloud Computing",
+        "DevOps",
+        "Segurança",
       ],
       popular: false,
+      gradient: "from-orange-500 to-red-500",
     },
     {
       icon: Palette,
       title: "UI/UX Design",
-      description: "Interfaces modernas e intuitivas que encantam usuários e convertem visitantes em clientes.",
+      description: "Design de interfaces modernas e intuitivas focadas na experiência do usuário.",
       features: [
-        "Design System",
-        "Prototipagem",
-        "User Research",
         "Wireframes",
+        "Prototipagem",
+        "Design System",
         "Testes de Usabilidade",
-        "shadcn/ui",
+        "Acessibilidade",
+        "Responsive Design",
       ],
       popular: false,
+      gradient: "from-green-500 to-emerald-500",
     },
     {
       icon: Cloud,
       title: "Cloud & DevOps",
-      description: "Infraestrutura escalável e segura com deploy automatizado e monitoramento contínuo.",
+      description: "Infraestrutura escalável e automatizada para seu negócio na nuvem.",
       features: [
-        "AWS / GCP / Azure",
-        "Vercel",
+        "AWS/Azure/GCP",
+        "Docker/Kubernetes",
         "CI/CD",
-        "Docker",
         "Monitoramento",
-        "Backup Automático",
+        "Auto-scaling",
+        "Backup & Recovery",
       ],
       popular: false,
+      gradient: "from-indigo-500 to-purple-500",
     },
     {
-      icon: Search,
+      icon: Layers,
       title: "Consultoria Técnica",
-      description: "Orientação especializada para escolher as melhores tecnologias e arquiteturas para seu projeto.",
+      description: "Orientação especializada para decisões tecnológicas estratégicas.",
       features: [
-        "Code Review",
         "Arquitetura de Software",
-        "Migração de Legacy",
-        "Treinamento de Equipes",
-        "Best Practices",
-        "Tech Stack Assessment",
+        "Code Review",
+        "Mentoria",
+        "Tech Stack",
+        "Performance",
+        "Segurança",
       ],
       popular: false,
+      gradient: "from-cyan-500 to-blue-500",
     },
   ];
 
-  const process = [
-    {
-      step: "01",
-      title: "Briefing & Descoberta",
-      description: "Entendemos suas necessidades, objetivos de negócio e requisitos técnicos.",
-    },
-    {
-      step: "02",
-      title: "Proposta & Planejamento",
-      description: "Apresentamos escopo, cronograma, investimento e stack tecnológica recomendada.",
-    },
-    {
-      step: "03",
-      title: "Design & Prototipagem",
-      description: "Criamos wireframes e protótipos para validação da experiência do usuário.",
-    },
-    {
-      step: "04",
-      title: "Desenvolvimento Ágil",
-      description: "Construímos em sprints com entregas incrementais e feedback constante.",
-    },
-    {
-      step: "05",
-      title: "Testes & Qualidade",
-      description: "Testes automatizados e manuais para garantir estabilidade e performance.",
-    },
-    {
-      step: "06",
-      title: "Deploy & Suporte",
-      description: "Lançamento monitorado e suporte contínuo para evolução do produto.",
-    },
+  const benefits = [
+    { icon: Zap, title: "Performance", description: "Otimização máxima" },
+    { icon: Shield, title: "Segurança", description: "Dados protegidos" },
+    { icon: Cpu, title: "Tecnologia", description: "Stack moderno" },
+    { icon: Globe, title: "Escalabilidade", description: "Crescimento garantido" },
   ];
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col min-h-screen relative">
+      <FuturisticBackground />
+
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 to-background py-20 md:py-32">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="relative pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden">
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="max-w-3xl"
+            className="flex flex-col items-center text-center space-y-8"
           >
-            <Badge variant="secondary" className="mb-4 px-4 py-2">
-              Nossos Serviços
-            </Badge>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-              Soluções Completas em{" "}
-              <span className="text-primary">Desenvolvimento</span>
-            </h1>
-            <p className="mt-6 text-lg text-muted-foreground max-w-2xl">
-              Do conceito ao deploy, oferecemos expertise técnica completa com
-              Next.js 14, TypeScript, Tailwind CSS e as melhores práticas do mercado.
-            </p>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Badge variant="secondary" className="px-4 py-2 text-sm border-cyan-400/30 bg-cyan-500/20 text-cyan-100 backdrop-blur-sm">
+                <Sparkles className="h-3 w-3 mr-2" />
+                Nossos Serviços
+              </Badge>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight max-w-5xl drop-shadow-lg"
+            >
+              <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
+                Soluções Completas
+              </span>
+              <br />
+              <span className="text-white">para seu Negócio Digital</span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="text-xl md:text-2xl text-cyan-100/80 max-w-3xl"
+            >
+              Transformamos ideias em produtos digitais de{" "}
+              <span className="text-cyan-300 font-semibold">alta performance</span> com
+              <span className="text-purple-400 font-semibold"> tecnologia de ponta</span>.
+            </motion.p>
+
+            {/* Benefits Grid */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8"
+            >
+              {benefits.map((benefit, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.6 + index * 0.1 }}
+                  className="text-center p-4 rounded-xl bg-slate-900/50 backdrop-blur-sm border-cyan-400/20"
+                >
+                  <benefit.icon className="h-8 w-8 text-cyan-300 mx-auto mb-2" />
+                  <div className="font-semibold text-white mb-1">{benefit.title}</div>
+                  <div className="text-xs text-cyan-100/70">{benefit.description}</div>
+                </motion.div>
+              ))}
+            </motion.div>
           </motion.div>
         </div>
       </section>
 
       {/* Services Grid */}
-      <section className="py-20 md:py-32">
+      <section className="py-20 md:py-32 relative">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            variants={staggerContainer}
+            initial="initial"
+            whileInView="animate"
             viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
             className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
           >
             {services.map((service, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
+                variants={fadeInUp}
+                whileHover={{ y: -5 }}
+                transition={{ duration: 0.2 }}
               >
-                <Card className={`h-full relative ${service.popular ? 'border-primary shadow-lg' : ''}`}>
+                <Card className={`relative overflow-hidden bg-slate-900/50 backdrop-blur-sm border-cyan-400/20 hover:border-cyan-400/40 transition-all duration-300 h-full group ${service.popular ? 'ring-2 ring-cyan-400/50' : ''}`}>
+                  <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${service.gradient}`} />
                   {service.popular && (
-                    <div className="absolute -top-3 right-4">
-                      <Badge className="bg-primary">Mais Popular</Badge>
-                    </div>
+                    <Badge className="absolute top-4 right-4 bg-cyan-500 text-white border-cyan-400/30">
+                      Mais Popular
+                    </Badge>
                   )}
                   <CardHeader>
-                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                      <service.icon className="h-6 w-6 text-primary" />
+                    <div className={`inline-flex h-14 w-14 rounded-xl bg-gradient-to-br ${service.gradient} items-center justify-center mb-4 shadow-lg`}>
+                      <service.icon className="h-7 w-7 text-white" />
                     </div>
-                    <CardTitle className="text-xl">{service.title}</CardTitle>
-                    <CardDescription>{service.description}</CardDescription>
+                    <CardTitle className="text-xl text-white">{service.title}</CardTitle>
+                    <CardDescription className="text-base text-cyan-100/70">{service.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ul className="space-y-2">
+                    <div className="space-y-2">
                       {service.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                          <span className="text-muted-foreground">{feature}</span>
-                        </li>
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                          <span className="text-cyan-100/70">{feature}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+                    <Link href="/orcamento" className="block mt-6">
+                      <Button variant="outline" className="w-full gap-2 group-hover:bg-gradient-to-r group-hover:from-cyan-500 group-hover:to-blue-500 group-hover:text-white border-cyan-400/50 hover:bg-cyan-500/20 text-cyan-400 hover:text-white backdrop-blur-sm transition-colors">
+                        <Rocket className="h-4 w-4" />
+                        Solicitar Orçamento
+                      </Button>
+                    </Link>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -214,136 +266,37 @@ export default function Servicos() {
         </div>
       </section>
 
-      {/* Tech Stack Highlight */}
-      <section className="py-20 md:py-32 bg-secondary/50">
-        <div className="container mx-auto px-4 md:px-6">
+      {/* CTA Section */}
+      <section className="py-20 md:py-32 bg-gradient-to-r from-slate-900/50 via-cyan-900/30 to-blue-900/30 relative overflow-hidden backdrop-blur-sm">
+        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)] pointer-events-none" />
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="text-center space-y-4 mb-16"
+            className="text-center max-w-4xl mx-auto"
           >
-            <Badge variant="outline" className="px-4 py-2">
-              Stack Tecnológica
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Tecnologias que Dominamos
+            <h2 className="text-4xl md:text-6xl text-cyan-100 font-bold mb-6 drop-shadow-lg">
+              Pronto para{" "}
+              <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
+                Começar?
+              </span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Trabalhamos apenas com tecnologias modernas, testadas e aprovadas
-              pelo mercado para garantir performance e escalabilidade.
+            <p className="text-xl text-cyan-100/80 mb-8">
+              Vamos transformar sua visão em realidade digital.
             </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6"
-          >
-            {[
-              { name: "Next.js 14+", icon: Layers },
-              { name: "TypeScript", icon: Code2 },
-              { name: "Tailwind CSS", icon: Zap },
-              { name: "Prisma", icon: Layers },
-              { name: "MySQL", icon: Cloud },
-              { name: "Better Auth", icon: Shield },
-            ].map((tech, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                className="flex flex-col items-center gap-3 p-6 rounded-lg bg-card hover:shadow-md transition-shadow"
-              >
-                <tech.icon className="h-8 w-8 text-primary" />
-                <span className="text-sm font-medium text-center">{tech.name}</span>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Process */}
-      <section className="py-20 md:py-32">
-        <div className="container mx-auto px-4 md:px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center space-y-4 mb-16"
-          >
-            <Badge variant="outline" className="px-4 py-2">
-              Processo
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Como Funciona
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Um processo estruturado e transparente para garantir entrega
-              dentro do prazo, orçamento e com a qualidade esperada.
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {process.map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-                className="relative group"
-              >
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-primary/50 rounded-lg blur opacity-0 group-hover:opacity-25 transition duration-300" />
-                <div className="relative bg-card rounded-lg p-6 space-y-3">
-                  <div className="text-sm font-bold text-primary">{item.step}</div>
-                  <h3 className="font-semibold text-lg">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 md:py-32 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 md:px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center space-y-6 max-w-3xl mx-auto"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Pronto para Iniciar seu Projeto?
-            </h2>
-            <p className="text-lg opacity-90">
-              Solicite um orçamento gratuito e descubra como podemos ajudar
-              a transformar sua ideia em realidade.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-              <Link href="/contato">
-                <Button size="lg" variant="secondary" className="gap-2">
-                  Solicitar Orçamento Gratuito
-                  <ArrowRight className="h-4 w-4" />
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/orcamento">
+                <Button size="lg" className="gap-2 h-14 px-8 text-lg bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-lg shadow-cyan-500/30">
+                  <Zap className="h-6 w-6" />
+                  Solicitar Orçamento
                 </Button>
               </Link>
-              <Link href="/sobre">
-                <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
-                  Conhecer a SoftRha
+              <Link href="/contato">
+                <Button variant="outline" size="lg" className="gap-2 h-14 px-8 text-lg border-cyan-400/50 hover:bg-cyan-500/20 text-clip-400 hover:text-white backdrop-blur-sm">
+                  <ArrowRight className="h-6 w-6" />
+                  Fale Conosco
                 </Button>
               </Link>
             </div>

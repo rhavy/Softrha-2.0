@@ -125,19 +125,48 @@ export default function DashboardConfiguracoes() {
     }
   };
 
-  const handleRemoveAvatar = () => {
-    setAvatarFile(null);
-    setAvatarUrl("");
+  const handleRemoveAvatar = async () => {
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("remove", "true");
+
+      const response = await fetch("/api/auth/upload-avatar", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        setAvatarFile(null);
+        setAvatarUrl("");
+        toast({
+          title: "Avatar removido!",
+          description: "Sua foto de perfil foi removida com sucesso.",
+        });
+        // Recarregar a página para atualizar a sessão
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        throw new Error("Erro ao remover avatar");
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover o avatar.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSaveAvatar = async () => {
     if (!avatarFile) return;
-    
+
     setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append("avatar", avatarFile);
-      
+
       const response = await fetch("/api/auth/upload-avatar", {
         method: "POST",
         body: formData,
@@ -149,13 +178,16 @@ export default function DashboardConfiguracoes() {
           description: "Sua foto de perfil foi atualizada com sucesso.",
         });
         setAvatarFile(null);
+        // Recarregar a página para atualizar a sessão
+        setTimeout(() => window.location.reload(), 1000);
       } else {
-        throw new Error("Erro ao atualizar avatar");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao atualizar avatar");
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar o avatar.",
+        description: error.message || "Não foi possível atualizar o avatar.",
         variant: "destructive",
       });
     } finally {

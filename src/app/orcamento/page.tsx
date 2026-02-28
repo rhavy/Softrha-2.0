@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { FuturisticBackground } from "@/components/ui/futuristic-background";
 
 // Feriados nacionais fixos do Brasil (mês/dia)
 const FIXED_HOLIDAYS = [
@@ -330,7 +331,7 @@ export default function Orcamento() {
   // Função para formatar CPF/CNPJ
   const formatDocument = (value: string) => {
     const digits = value.replace(/\D/g, "");
-    
+
     if (digits.length <= 11) {
       // CPF: 000.000.000-00
       return digits
@@ -352,7 +353,7 @@ export default function Orcamento() {
   // Função para formatar telefone
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "");
-    
+
     if (digits.length <= 10) {
       // Telefone fixo: (00) 0000-0000
       return digits
@@ -527,7 +528,7 @@ export default function Orcamento() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold">Qual tipo de projeto você deseja?</h3>
+              <h3 className="text-2xl font-bold text-primary">Qual tipo de projeto você deseja?</h3>
               <p className="text-muted-foreground">Selecione a opção que melhor se encaixa na sua necessidade</p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -539,8 +540,8 @@ export default function Orcamento() {
                 >
                   <Card
                     className={`cursor-pointer transition-all hover:shadow-lg ${budget.projectType === type.id
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : ""
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : ""
                       }`}
                     onClick={() => setBudget({ ...budget, projectType: type.id as ProjectType })}
                   >
@@ -571,7 +572,7 @@ export default function Orcamento() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold">Qual o nível de complexidade?</h3>
+              <h3 className="text-2xl font-bold text-primary">Qual o nível de complexidade?</h3>
               <p className="text-muted-foreground">Isso nos ajuda a entender a sofisticação do seu projeto</p>
             </div>
 
@@ -602,8 +603,8 @@ export default function Orcamento() {
                 >
                   <Card
                     className={`cursor-pointer transition-all hover:shadow-lg ${budget.complexity === comp.id
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : ""
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : ""
                       }`}
                     onClick={() => setBudget({ ...budget, complexity: comp.id as Complexity })}
                   >
@@ -634,7 +635,7 @@ export default function Orcamento() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold">Qual o prazo desejado?</h3>
+              <h3 className="text-2xl font-bold text-primary">Qual o prazo desejado?</h3>
               <p className="text-muted-foreground">
                 O cálculo considera apenas dias úteis (segunda a sexta, sem feriados)
               </p>
@@ -667,8 +668,8 @@ export default function Orcamento() {
                 >
                   <Card
                     className={`cursor-pointer transition-all hover:shadow-lg ${budget.timeline === time.id
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : ""
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : ""
                       }`}
                     onClick={() => setBudget({ ...budget, timeline: time.id as Timeline })}
                   >
@@ -701,7 +702,7 @@ export default function Orcamento() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold">Quais funcionalidades você precisa?</h3>
+              <h3 className="text-2xl font-bold text-primary">Quais funcionalidades você precisa?</h3>
               <p className="text-muted-foreground">Selecione as funcionalidades desejadas (opcional)</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -713,8 +714,8 @@ export default function Orcamento() {
                 >
                   <Card
                     className={`cursor-pointer transition-all ${budget.features.includes(feature.id)
-                        ? "border-primary bg-primary/5"
-                        : ""
+                      ? "border-primary bg-primary/5"
+                      : ""
                       }`}
                     onClick={() => toggleFeature(feature.id)}
                   >
@@ -747,7 +748,7 @@ export default function Orcamento() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold">Quais integrações você precisa?</h3>
+              <h3 className="text-2xl font-bold text-primary">Quais integrações você precisa?</h3>
               <p className="text-muted-foreground">Conecte seu projeto a ferramentas externas (opcional)</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -759,8 +760,8 @@ export default function Orcamento() {
                 >
                   <Card
                     className={`cursor-pointer transition-all ${budget.integrations.includes(integration.id)
-                        ? "border-primary bg-primary/5"
-                        : ""
+                      ? "border-primary bg-primary/5"
+                      : ""
                       }`}
                     onClick={() => toggleIntegration(integration.id)}
                   >
@@ -787,7 +788,7 @@ export default function Orcamento() {
               ))}
             </div>
             <div className="mt-4">
-              <label className="text-sm font-medium mb-2 block">
+              <label className="text-sm font-medium mb-2 block text-primary">
                 Quantidade de páginas estimada: {budget.pages}
               </label>
               <input
@@ -809,7 +810,7 @@ export default function Orcamento() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold">Último passo! Vamos nos conectar?</h3>
+              <h3 className="text-2xl font-bold text-primary">Último passo! Vamos nos conectar?</h3>
               <p className="text-muted-foreground">Preencha seus dados para receber o orçamento completo</p>
             </div>
             <Card>
@@ -935,7 +936,7 @@ export default function Orcamento() {
         <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
           <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
         </div>
-        <h2 className="text-3xl font-bold">Orçamento Calculado!</h2>
+        <h2 className="text-3xl font-bold text-primary">Orçamento Calculado!</h2>
         <p className="text-muted-foreground">
           Com base nas suas escolhas, aqui está a estimativa para seu projeto
         </p>
@@ -943,7 +944,7 @@ export default function Orcamento() {
 
       <Card className="border-primary/50 bg-gradient-to-br from-primary/5 to-primary/10">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Investimento Estimado</CardTitle>
+          <CardTitle className="text-2xl text-green-600 dark:text-green-400">Investimento Estimado</CardTitle>
           <div className="flex items-center justify-center gap-2 mt-4">
             <span className="text-5xl font-bold text-primary">
               R$ {estimate.min.toLocaleString("pt-BR")}
@@ -963,7 +964,7 @@ export default function Orcamento() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-            <CardTitle className="text-lg text-orange-800 dark:text-orange-200">
+            <CardTitle className="text-lg text-orange-800 dark:text-orange-600">
               Importante sobre esta simulação
             </CardTitle>
           </div>
@@ -1232,124 +1233,133 @@ export default function Orcamento() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background py-12 px-4 md:px-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4 mb-8"
-        >
-          <Badge variant="outline" className="px-4 py-2 text-sm">
-            <DollarSign className="h-4 w-4 mr-1" />
-            Orçamento Online
-          </Badge>
-          <h1 className="text-4xl md:text-5xl font-bold">
-            Calcule o Investimento do seu Projeto
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Responda algumas perguntas e receba uma estimativa instantânea
-            para desenvolvimento do seu software, site ou aplicativo.
-          </p>
-        </motion.div>
+    /* 1. Container relativo para gerenciar as camadas */
+    <div className="relative min-h-screen w-full">
 
-        {/* Progress Steps */}
-        {!calculated && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              {[1, 2, 3, 4, 5, 6].map((step) => (
-                <div key={step} className="flex items-center">
-                  <div
-                    className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${step <= budget.step
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                      }`}
-                  >
-                    {step < budget.step ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      step
+    /* 2. O fundo fica fixo atrás de tudo */
+      <FuturisticBackground />
+
+    /* 3. O conteúdo principal com z-10 para ficar acima do fundo */
+      <main className="relative z-10 py-12 px-4 md:px-6">
+        <div className="max-w-4xl mx-auto">
+
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-4 mb-8"
+          >
+            <Badge variant="outline" className="px-4 py-2 text-sm border-cyan-500/50 text-cyan-400 bg-cyan-950/20">
+              <DollarSign className="h-4 w-4 mr-1" />
+              Orçamento Online
+            </Badge>
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+              Calcule o Investimento do seu Projeto
+            </h1>
+            <p className="text-lg text-slate-400 max-w-2xl mx-auto">
+              Responda algumas perguntas e receba uma estimativa instantânea
+              para desenvolvimento do seu software, site ou aplicativo.
+            </p>
+          </motion.div>
+
+          {/* Progress Steps */}
+          {!calculated && (
+            <div className="mb-12">
+              <div className="flex items-center justify-between">
+                {[1, 2, 3, 4, 5, 6].map((step) => (
+                  <div key={step} className="flex items-center">
+                    <div
+                      className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 shadow-lg ${step <= budget.step
+                        ? "bg-cyan-500 text-white shadow-cyan-500/20"
+                        : "bg-slate-800 text-slate-500 border border-slate-700"
+                        }`}
+                    >
+                      {step < budget.step ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : (
+                        step
+                      )}
+                    </div>
+                    {step < 6 && (
+                      <div
+                        className={`w-8 md:w-16 h-1 mx-2 rounded-full transition-colors duration-500 ${step < budget.step ? "bg-cyan-500" : "bg-slate-800"
+                          }`}
+                      />
                     )}
                   </div>
-                  {step < 6 && (
-                    <div
-                      className={`w-8 md:w-16 h-0.5 mx-2 ${step < budget.step ? "bg-primary" : "bg-muted"
-                        }`}
-                    />
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="flex justify-between mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">
+                <span className={budget.step >= 1 ? "text-cyan-400" : ""}>Projeto</span>
+                <span className={budget.step >= 2 ? "text-cyan-400" : ""}>Complexidade</span>
+                <span className={budget.step >= 3 ? "text-cyan-400" : ""}>Prazo</span>
+                <span className={budget.step >= 4 ? "text-cyan-400" : ""}>Features</span>
+                <span className={budget.step >= 5 ? "text-cyan-400" : ""}>Integrações</span>
+                <span className={budget.step >= 6 ? "text-cyan-400" : ""}>Contato</span>
+              </div>
             </div>
-            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-              <span>Projeto</span>
-              <span>Complexidade</span>
-              <span>Prazo</span>
-              <span>Features</span>
-              <span>Integrações</span>
-              <span>Contato</span>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Content */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={calculated ? "summary" : `step-${budget.step}`}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            {calculated ? renderSummary() : renderStep()}
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Navigation Buttons */}
-        {!calculated && (
-          <div className="flex justify-between mt-8">
-            <Button
-              variant="outline"
-              onClick={handleBack}
-              disabled={budget.step === 1}
-              className="gap-2"
+          {/* Content Area - Cartões com leve transparência para combinar com o fundo */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={calculated ? "summary" : `step-${budget.step}`}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="backdrop-blur-sm"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
-            </Button>
-            <div className="flex items-center gap-4">
-              {budget.step < 6 && (
-                <Button
-                  onClick={handleNext}
-                  disabled={
-                    (budget.step === 1 && !budget.projectType) ||
-                    (budget.step === 2 && !budget.complexity) ||
-                    (budget.step === 3 && !budget.timeline)
-                  }
-                  className="gap-2"
-                >
-                  Próximo
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              )}
-              {budget.step === 6 && (
-                <Button
-                  onClick={handleFinalizar}
-                  disabled={
-                    !budget.firstName || 
-                    !budget.lastName || 
-                    !budget.document || 
-                    (!budget.email && !budget.phone)
-                  }
-                  className="gap-2"
-                >
-                  Revisar Orçamento
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              )}
+              {calculated ? renderSummary() : renderStep()}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation Buttons */}
+          {!calculated && (
+            <div className="flex justify-between mt-10 pt-6 border-t border-slate-800">
+              <Button
+                variant="ghost"
+                onClick={handleBack}
+                disabled={budget.step === 1}
+                className="gap-2 text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Button>
+              <div className="flex items-center gap-4">
+                {budget.step < 6 ? (
+                  <Button
+                    onClick={handleNext}
+                    disabled={
+                      (budget.step === 1 && !budget.projectType) ||
+                      (budget.step === 2 && !budget.complexity) ||
+                      (budget.step === 3 && !budget.timeline)
+                    }
+                    className="gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-8 shadow-lg shadow-cyan-900/20"
+                  >
+                    Próximo
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleFinalizar}
+                    disabled={
+                      !budget.firstName ||
+                      !budget.lastName ||
+                      !budget.document ||
+                      (!budget.email && !budget.phone)
+                    }
+                    className="gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-8 shadow-lg shadow-cyan-900/20"
+                  >
+                    Revisar Orçamento
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

@@ -12,6 +12,17 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get("avatar") as File;
+    const remove = formData.get("remove") === "true";
+
+    // Remover avatar
+    if (remove) {
+      await prisma.user.update({
+        where: { id: sessionData.session.userId },
+        data: { image: null },
+      });
+
+      return NextResponse.json({ success: true, avatarUrl: null });
+    }
 
     if (!file) {
       return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 });

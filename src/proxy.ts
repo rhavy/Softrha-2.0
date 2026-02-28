@@ -7,7 +7,6 @@ export const config = {
     "/registro",
     "/conta-nao-verificada",
     "/projetos/:path*",
-    "/orcamento/:path*",
   ],
 };
 
@@ -17,7 +16,7 @@ export default async function proxy(request: NextRequest) {
     console.log("[PROXY] Pathname:", pathname);
 
     // Rotas protegidas que requerem autenticação
-    const protectedRoutes = ["/dashboard", "/projetos", "/orcamento"];
+    const protectedRoutes = ["/dashboard", "/projetos"];
 
     // Rotas de auth que não devem ser acessadas se já estiver logado
     const authRoutes = ["/login", "/registro"];
@@ -51,11 +50,11 @@ export default async function proxy(request: NextRequest) {
     // Se estiver autenticado e email não verificado, verificar redirecionamento
     if (sessionCookie && isProtectedRoute && !isUnverifiedRoute) {
       console.log("[PROXY] Verificando emailVerified...");
-      
+
       try {
         // Usar a API do Better Auth para validar sessão
         const { auth } = await import("@/lib/auth");
-        
+
         const session = await auth.api.getSession({
           headers: {
             cookie: `better-auth.session_token=${sessionCookie.value}`,
@@ -66,9 +65,9 @@ export default async function proxy(request: NextRequest) {
 
         if (session?.user) {
           const prisma = (await import("@/lib/prisma")).prisma;
-          
+
           console.log("[PROXY] User ID:", session.user.id);
-          
+
           const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: { emailVerified: true },
