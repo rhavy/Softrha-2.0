@@ -521,6 +521,24 @@ model Contact {
   @@map("contacts")
 }
 
+// Modelo para mensagens de contato do formulário público
+model ContactMessage {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  company     String
+  phone       String
+  projectType String // web, mobile, software, consultoria
+  message     String   @db.Text
+  status      String   @default("pending") // pending, contacted, resolved
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("contact_messages")
+}
+
 model Comment {
   id        String   @id @default(cuid())
   content   String   @db.Text

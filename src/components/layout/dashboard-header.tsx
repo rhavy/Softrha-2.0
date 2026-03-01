@@ -17,10 +17,12 @@ import {
   Trash2,
   ExternalLink,
   AlertTriangle,
+  MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useContactMessages } from "@/hooks/use-contact-messages";
 import { useSession } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -58,9 +60,11 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, refresh } = useNotifications();
+  const { messages, markAsContacted, markAsResolved, deleteMessage, refresh: refreshMessages } = useContactMessages();
   const { data: session } = useSession();
 
   const user = session?.user;
@@ -288,6 +292,171 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
                         onClick={refresh}
                       >
                         Atualizar
+                      </Button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Messages (Contact Messages) */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMessagesOpen(!messagesOpen)}
+              className="relative"
+            >
+              <MessageSquare className="h-5 w-5" />
+              {messages.length > 0 && (
+                <Badge
+                  variant="default"
+                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center bg-amber-600 hover:bg-amber-600"
+                >
+                  {messages.length > 99 ? "99+" : messages.length}
+                </Badge>
+              )}
+            </Button>
+
+            {/* Messages Dropdown */}
+            <AnimatePresence>
+              {messagesOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setMessagesOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-96 rounded-md border bg-popover p-0 shadow-lg z-50 max-h-[500px] flex flex-col"
+                  >
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 border-b">
+                      <div>
+                        <p className="font-semibold">Mensagens de Clientes</p>
+                        <p className="text-xs text-muted-foreground">
+                          {messages.length} pendente(s)
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={refreshMessages}
+                        className="text-xs h-8"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Atualizar
+                      </Button>
+                    </div>
+
+                    {/* Messages List */}
+                    <div className="overflow-y-auto flex-1 max-h-[400px]">
+                      {messages.length === 0 ? (
+                        <div className="p-8 text-center text-muted-foreground">
+                          <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">Nenhuma mensagem pendente</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y">
+                          {messages.map((msg) => (
+                            <div
+                              key={msg.id}
+                              className="p-4 hover:bg-accent cursor-pointer transition-colors bg-amber-50/30"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="h-2 w-2 rounded-full mt-2 bg-amber-600" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="text-sm font-semibold">
+                                      {msg.name}
+                                    </p>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteMessage(msg.id);
+                                      }}
+                                      className="text-muted-foreground hover:text-destructive transition-colors"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {msg.email}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                    {msg.message}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDistanceToNow(new Date(msg.createdAt), {
+                                        addSuffix: true,
+                                        locale: ptBR,
+                                      })}
+                                    </span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {msg.projectType}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1 mt-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        markAsContacted(msg.id);
+                                      }}
+                                    >
+                                      Contatar
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        markAsResolved(msg.id);
+                                      }}
+                                    >
+                                      Resolver
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMessagesOpen(false);
+                                        router.push("/dashboard/Mensagems");
+                                      }}
+                                    >
+                                      Ver todas
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-3 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => {
+                          setMessagesOpen(false);
+                          router.push("/dashboard/Mensagems");
+                        }}
+                      >
+                        Gerenciar todas as mensagens
                       </Button>
                     </div>
                   </motion.div>

@@ -81,6 +81,7 @@ interface Project {
   lastUrlChangeReason?: string | null;
   lastUrlChangeDescription?: string | null;
   lastUrlChangedAt?: string | null;
+  createdById?: string | null;
   createdAt: string;
   updatedAt: string;
   client?: {
@@ -254,6 +255,11 @@ export default function ProjetoDetalhesPage() {
   const isAcceptedByCurrentUser = () => {
     if (!currentUser || !budget) return false;
     return budget.acceptedBy === currentUser.id;
+  };
+
+  const isCreatedByCurrentUser = () => {
+    if (!currentUser || !project) return false;
+    return project.createdById === currentUser.id;
   };
 
   const fetchProject = async () => {
@@ -1105,10 +1111,10 @@ export default function ProjetoDetalhesPage() {
                   Notificar Evolução
                 </Button>
               )}
-              {/* Botão Enviar Pagamento Final - aparece apenas se aceito pelo usuário atual */}
+              {/* Botão Enviar Pagamento Final - aparece apenas se o projeto está 100% concluído e o usuário atual é o criador ou aceitou o orçamento */}
               {project.progress === 100 &&
                 (project.status === "development_100" || project.status === "waiting_final_payment") &&
-                isAcceptedByCurrentUser() && (
+                (isAcceptedByCurrentUser() || isCreatedByCurrentUser()) && (
                   <Button
                     variant="outline"
                     size="sm"

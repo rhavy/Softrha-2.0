@@ -16,6 +16,10 @@ import {
   ChevronRight,
   Edit2,
   Trash2,
+  MessageSquare,
+  FolderKanban,
+  Mic,
+  Phone,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NovoEventoModal } from "@/components/modals/novo-evento-modal";
@@ -57,8 +61,8 @@ const monthNames = [
 
 export default function DashboardCalendario() {
   const { toast } = useToast();
-  const [currentDate] = useState(new Date(2026, 1, 20)); // Fevereiro 2026
-  const [selectedDate, setSelectedDate] = useState<number | null>(20);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<number | null>(new Date().getDate());
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<any>(null);
@@ -66,6 +70,10 @@ export default function DashboardCalendario() {
   const [eventsList, setEventsList] = useState<any[]>([]);
   const [schedulesList, setSchedulesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal de detalhes do agendamento
+  const [scheduleDetailOpen, setScheduleDetailOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
 
   // Carregar eventos e agendamentos do banco de dados
   const fetchEvents = async () => {
@@ -98,7 +106,39 @@ export default function DashboardCalendario() {
 
   useEffect(() => {
     fetchEvents();
+
+    // Atualizar eventos e agendamentos a cada 5 segundos
+    const intervalId = setInterval(() => {
+      fetchEvents();
+    }, 5000);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
+
+  const previousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setSelectedDate(null);
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setSelectedDate(null);
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+    setSelectedDate(new Date().getDate());
+  };
+
+  // Abrir modal de detalhes do agendamento
+  const handleOpenScheduleDetail = (schedule: any) => {
+    setSelectedSchedule(schedule);
+    setScheduleDetailOpen(true);
+  };
 
   const handleNewEvent = async (data: any) => {
     try {
@@ -139,7 +179,7 @@ export default function DashboardCalendario() {
       setModalOpen(false);
       toast({
         title: "Evento criado!",
-        description: data.participants?.length > 0 
+        description: data.participants?.length > 0
           ? "Evento criado e notificações enviadas aos participantes."
           : "Evento criado com sucesso.",
       });
@@ -233,8 +273,19 @@ export default function DashboardCalendario() {
 
   const getEventsForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const events = eventsList.filter(event => event.date === dateStr);
-    const schedules = schedulesList.filter(schedule => schedule.date === dateStr);
+
+    // Filtrar eventos pela data exata (comparação direta de strings YYYY-MM-DD)
+    const events = eventsList.filter(event => {
+      // event.date já vem como "YYYY-MM-DD" da API
+      return event.date === dateStr;
+    });
+
+    // Filtrar agendamentos pela data exata (comparação direta de strings YYYY-MM-DD)
+    const schedules = schedulesList.filter(schedule => {
+      // schedule.date já vem como "YYYY-MM-DD" da API
+      return schedule.date === dateStr;
+    });
+
     return [...events, ...schedules];
   };
 
@@ -276,17 +327,17 @@ export default function DashboardCalendario() {
               {/* Month Navigation */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                  <Button variant="outline" size="icon">
+                  <Button variant="outline" size="icon" onClick={previousMonth}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <h2 className="text-lg font-semibold">
                     {monthNames[month]} {year}
                   </h2>
-                  <Button variant="outline" size="icon">
+                  <Button variant="outline" size="icon" onClick={nextMonth}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={goToToday}>
                   Hoje
                 </Button>
               </div>
@@ -318,17 +369,15 @@ export default function DashboardCalendario() {
                     <button
                       key={day}
                       onClick={() => setSelectedDate(day)}
-                      className={`h-24 p-2 text-left border rounded-lg transition-colors hover:bg-muted ${
-                        isSelected ? "bg-primary/10 border-primary" : ""
-                      }`}
+                      className={`h-24 p-2 text-left border rounded-lg transition-colors hover:bg-muted ${isSelected ? "bg-primary/10 border-primary" : ""
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span
-                          className={`text-sm font-medium ${
-                            isTodayDay
-                              ? "h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center"
-                              : ""
-                          }`}
+                          className={`text-sm font-medium ${isTodayDay
+                            ? "h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center"
+                            : ""
+                            }`}
                         >
                           {day}
                         </span>
@@ -459,7 +508,8 @@ export default function DashboardCalendario() {
                 {getEventsForDay(selectedDate).map((event) => (
                   <div
                     key={event.id}
-                    className="flex items-center gap-4 p-4 rounded-lg border"
+                    className="flex items-center gap-4 p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => event.type === "delivery" ? handleOpenScheduleDetail(event) : null}
                   >
                     <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${eventColors[event.type]} bg-opacity-20`}>
                       {event.type === "delivery" ? (
@@ -511,6 +561,31 @@ export default function DashboardCalendario() {
                             {event.meetingType === "video" ? "Vídeo" : "Áudio"}
                           </span>
                         )}
+                        {/* Exibir WhatsApp para reuniões agendadas */}
+                        {event.type === "meeting" && event.clientPhone && (
+                          <a
+                            href={`https://wa.me/55${event.clientPhone.replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Este é um lembrete do seu agendamento de reunião para ${event.date} às ${event.time}.`)}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              variant="outline"
+                              size="sm"
+                            >
+                              <span className="flex items-center gap-1">
+                                <Phone className="h-4 w-4" />
+                                WhatsApp: {event.clientPhone}
+                              </span>
+                            </Button>
+                          </a>
+                        )}
+                        {event.type === "meeting" && event.meetingPeriod && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            Período: {event.meetingPeriod === "manha" ? "Manhã" : "Tarde"}
+                          </span>
+                        )}
                       </div>
                       {event.type === "delivery" && event.meetingLink && (
                         <div className="mt-2">
@@ -525,6 +600,12 @@ export default function DashboardCalendario() {
                         </div>
                       )}
                       {event.type === "delivery" && event.notes && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          📝 {event.notes}
+                        </p>
+                      )}
+                      {/* Exibir notas para reuniões */}
+                      {event.type === "meeting" && event.notes && (
                         <p className="text-xs text-muted-foreground mt-2">
                           📝 {event.notes}
                         </p>
@@ -576,7 +657,7 @@ export default function DashboardCalendario() {
             <DialogHeader>
               <DialogTitle>Confirmar Exclusão</DialogTitle>
               <DialogDescription>
-                Tem certeza que deseja excluir "{eventToDelete?.title}"? 
+                Tem certeza que deseja excluir "{eventToDelete?.title}"?
                 Esta ação não pode ser desfeita.
               </DialogDescription>
             </DialogHeader>
@@ -589,6 +670,167 @@ export default function DashboardCalendario() {
                 Excluir
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Schedule Detail Dialog */}
+        <Dialog open={scheduleDetailOpen} onOpenChange={setScheduleDetailOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="h-5 w-5 text-cyan-400" />
+                Detalhes do Agendamento
+              </DialogTitle>
+              <DialogDescription>
+                Informações completas do agendamento
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedSchedule && (
+              <div className="space-y-6">
+                {/* Header com status */}
+                <div className="flex items-center justify-between p-4 rounded-lg bg-cyan-500/10 border border-cyan-400/20">
+                  <div>
+                    <p className="font-semibold text-lg text-white">{selectedSchedule.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedSchedule.projectType}
+                    </p>
+                  </div>
+                  <Badge className={selectedSchedule.status === "scheduled" ? "bg-green-600" : "bg-amber-600"}>
+                    {selectedSchedule.status === "scheduled" ? "Agendado" : selectedSchedule.status}
+                  </Badge>
+                </div>
+
+                {/* Informações do Cliente */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <Users className="h-4 w-4 text-cyan-400" />
+                    Informações do Cliente
+                  </h3>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Nome do Cliente</p>
+                      <p className="font-medium text-white">{selectedSchedule.clientName || "—"}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">WhatsApp</p>
+                      <p className="font-medium text-white">{selectedSchedule.clientPhone || selectedSchedule.notes?.match(/WhatsApp: (.+?)(?: - |$)/)?.[1] || "—"}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Tipo de Projeto</p>
+                      <p className="font-medium text-white capitalize">{selectedSchedule.projectType || "—"}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Período</p>
+                      <p className="font-medium text-white capitalize">{selectedSchedule.meetingPeriod || selectedSchedule.notes?.match(/Período: (Manhã|Tarde)/)?.[1] || "—"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalhes do Agendamento */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-cyan-400" />
+                    Detalhes do Agendamento
+                  </h3>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Data</p>
+                      <p className="font-medium text-white">
+                        {(() => {
+                          // Corrigir fuso horário - criar data no timezone local
+                          const [year, month, day] = selectedSchedule.date.split('-').map(Number);
+                          const eventDate = new Date(year, month - 1, day);
+                          return eventDate.toLocaleDateString("pt-BR", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          });
+                        })()}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Horário</p>
+                      <p className="font-medium text-white">{selectedSchedule.time || "—"}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Tipo de Reunião</p>
+                      <p className="font-medium text-white flex items-center gap-2">
+                        {selectedSchedule.meetingType === "video" ? (
+                          <><Video className="h-4 w-4 text-cyan-400" /> Vídeo Chamada</>
+                        ) : (
+                          <><Mic className="h-4 w-4 text-cyan-400" /> Áudio Chamada</>
+                        )}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <p className="font-medium text-white capitalize">{selectedSchedule.status}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Link da Reunião */}
+                {selectedSchedule.meetingLink && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-white flex items-center gap-2">
+                      <Video className="h-4 w-4 text-cyan-400" />
+                      Link da Reunião
+                    </h3>
+                    <div className="p-3 rounded-lg bg-muted/50 border border-cyan-400/20">
+                      <p className="text-sm text-cyan-400 break-all">{selectedSchedule.meetingLink}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => window.open(selectedSchedule.meetingLink, "_blank")}
+                      >
+                        <Video className="h-3 w-3 mr-2" />
+                        Abrir Reunião
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Observações */}
+                {selectedSchedule.notes && (
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-white flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-cyan-400" />
+                      Observações
+                    </h3>
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedSchedule.notes}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ações */}
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setScheduleDetailOpen(false)}
+                  >
+                    Fechar
+                  </Button>
+                  {selectedSchedule.projectId && (
+                    <Button
+                      variant="default"
+                      className="flex-1 bg-cyan-600 hover:bg-cyan-700"
+                      onClick={() => {
+                        setScheduleDetailOpen(false);
+                        window.location.href = `/dashboard/projetos/${selectedSchedule.projectId}`;
+                      }}
+                    >
+                      <FolderKanban className="h-4 w-4 mr-2" />
+                      Ver Projeto
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </motion.div>

@@ -134,6 +134,47 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Método 2.1: Buscar metadados diretamente do Payment Link do Stripe
+      if (!payment && session.payment_link && !budgetId) {
+        try {
+          const paymentLinkId = typeof session.payment_link === 'string'
+            ? session.payment_link
+            : (session.payment_link as any).id;
+
+          console.log("[Webhook] Buscando metadados do Payment Link no Stripe:", paymentLinkId);
+          const stripePaymentLink = await stripe.paymentLinks.retrieve(paymentLinkId);
+          console.log("[Webhook] Payment Link retrieved:", {
+            id: stripePaymentLink.id,
+            metadata: stripePaymentLink.metadata,
+            payment_intent_data: (stripePaymentLink as any).payment_intent_data,
+          });
+
+          if (stripePaymentLink.metadata?.budgetId) {
+            budgetId = stripePaymentLink.metadata.budgetId;
+            paymentType = stripePaymentLink.metadata.type || "down_payment";
+            console.log("[Webhook] ✅ budgetId encontrado no Stripe Payment Link:", budgetId);
+
+            // Buscar pagamento com budgetId encontrado
+            payment = await prisma.payment.findFirst({
+              where: {
+                budgetId: budgetId,
+                type: paymentType,
+              },
+              include: {
+                budget: true,
+                project: true,
+              },
+            });
+
+            if (payment) {
+              console.log("[Webhook] Pagamento encontrado após buscar no Stripe:", payment.id);
+            }
+          }
+        } catch (error) {
+          console.error("[Webhook] Erro ao buscar Payment Link no Stripe:", error);
+        }
+      }
+
       // Método 2.5: Se ainda não encontrou e tem budgetId dos metadados, buscar todos pagamentos do budget
       if (!payment && budgetId) {
         console.log("[Webhook] Buscando TODOS pagamentos do budget:", budgetId);
@@ -205,7 +246,7 @@ export async function POST(request: NextRequest) {
           // Para pagamento final, ainda precisamos atualizar projeto e budget
           if (payment.type === "final_payment") {
             console.log(`[Webhook] Processando atualização de projeto para pagamento final ${payment.id}`);
-            
+
             // Buscar budget se não estiver incluído
             let budget = payment.budget;
             if (!budget && payment.budgetId) {
@@ -214,7 +255,7 @@ export async function POST(request: NextRequest) {
                 where: { id: payment.budgetId },
               });
             }
-            
+
             if (budget) {
               await handleFinalPayment(payment, budget);
             } else {
@@ -226,8 +267,9 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          // Atualizar pagamento para pago
-          await prisma.payment.update({
+          // === IMPORTANTE: Atualizar primeiro o status do pagamento ===
+          console.log(`[Webhook] Atualizando pagamento ${payment.id} para status "paid"...`);
+          const updatedPayment = await prisma.payment.update({
             where: { id: payment.id },
             data: {
               status: "paid",
@@ -235,8 +277,11 @@ export async function POST(request: NextRequest) {
               stripePaymentId: session.payment_intent as string || session.id as string,
             },
           });
-
-          console.log(`[Webhook] Pagamento ${payment.id} marcado como pago.`);
+          console.log(`[Webhook] Pagamento atualizado:`, {
+            id: updatedPayment.id,
+            status: updatedPayment.status,
+            paidAt: updatedPayment.paidAt,
+          });
 
           // Buscar budget se não estiver incluído
           let budget = payment.budget;
@@ -250,22 +295,22 @@ export async function POST(request: NextRequest) {
           if (budget) {
             // Verificar tipo de pagamento
             console.log(`[Webhook] Tipo de pagamento identificado: ${payment.type}`);
-            console.log(`[Webhook] Budget ID: ${budget.id}, Status: ${budget.status}`);
+            console.log(`[Webhook] Budget ID: ${budget.id}, Status ANTES: ${budget.status}`);
 
             if (payment.type === "down_payment") {
               // PAGAMENTO DE ENTRADA (25%)
               console.log(`[Webhook] Processando pagamento de entrada para orçamento ${budget.id}`);
-              await handleDownPayment(payment, budget);
+              await handleDownPayment(updatedPayment, budget);
             } else if (payment.type === "final_payment") {
               // PAGAMENTO FINAL (75%)
               console.log(`[Webhook] Processando pagamento final para projeto ${payment.projectId}`);
               console.log(`[Webhook] Dados do pagamento final:`, {
-                paymentId: payment.id,
-                projectId: payment.projectId,
-                budgetId: payment.budgetId,
-                amount: payment.amount,
+                paymentId: updatedPayment.id,
+                projectId: updatedPayment.projectId,
+                budgetId: updatedPayment.budgetId,
+                amount: updatedPayment.amount,
               });
-              await handleFinalPayment(payment, budget);
+              await handleFinalPayment(updatedPayment, budget);
             } else {
               console.warn(`[Webhook] Tipo de pagamento desconhecido: ${payment.type}`);
             }

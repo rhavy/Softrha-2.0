@@ -6,8 +6,54 @@ import { generatePaymentLink } from "@/lib/stripe";
 const resend = process.env.RESEND_API_KEY ? new (require("resend").Resend)(process.env.RESEND_API_KEY) : null;
 
 /**
+ * GET /api/projetos/[id]/pagamento-final
+ *
+ * Busca informações do pagamento final (75% restante)
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: projectId } = await params;
+
+    // Buscar pagamento final
+    const payment = await prisma.payment.findFirst({
+      where: {
+        projectId,
+        type: "final_payment",
+      },
+    });
+
+    if (!payment) {
+      return NextResponse.json({
+        payment: null,
+        paymentLink: null,
+      });
+    }
+
+    return NextResponse.json({
+      payment: {
+        id: payment.id,
+        amount: payment.amount,
+        status: payment.status,
+        paidAt: payment.paidAt,
+        dueDate: payment.dueDate,
+      },
+      paymentLink: payment.stripePaymentLinkId ? payment.stripePaymentLinkId : null,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar pagamento final:", error);
+    return NextResponse.json(
+      { error: "Erro ao buscar pagamento final" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * POST /api/projetos/[id]/pagamento-final
- * 
+ *
  * Gera link de pagamento final (75% restante)
  */
 export async function POST(

@@ -20,6 +20,7 @@ import {
   Bell,
   BarChart3,
   Star,
+  MessageSquare,
 } from "lucide-react";
 
 interface DashboardLayoutProps {
@@ -36,29 +37,35 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
   { icon: BarChart3, label: "Relatórios", href: "/dashboard/relatorios" },
-  { 
-    icon: Star, 
-    label: "Avaliações", 
+  {
+    icon: Star,
+    label: "Avaliações",
     href: "/dashboard/avaliacoes",
     allowedRoles: ["ADMIN"]
   },
-  { 
-    icon: Users, 
-    label: "Clientes", 
+  {
+    icon: Users,
+    label: "Clientes",
     href: "/dashboard/clientes",
     allowedRoles: ["ADMIN"]
   },
-  { 
-    icon: DollarSign, 
-    label: "Orçamentos", 
+  {
+    icon: DollarSign,
+    label: "Orçamentos",
     href: "/dashboard/orcamentos",
     allowedRoles: ["ADMIN", "TEAM_MEMBER_GERENTE"]
   },
   { icon: FolderKanban, label: "Projetos", href: "/dashboard/projetos" },
   { icon: Bell, label: "Notificações", href: "/dashboard/notificacoes" },
-  { 
-    icon: Users, 
-    label: "Equipe", 
+  {
+    icon: MessageSquare,
+    label: "Mensagens",
+    href: "/dashboard/Mensagems",
+    allowedRoles: ["ADMIN"]
+  },
+  {
+    icon: Users,
+    label: "Equipe",
     href: "/dashboard/equipe",
     allowedRoles: ["ADMIN"]
   },

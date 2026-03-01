@@ -60,7 +60,7 @@ export const generatePaymentLink = async (
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/obrigado/pagamento?session_id={CHECKOUT_SESSION_ID}&payment_link_id=${metadata.budgetId}`,
+          url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/obrigado/pagamento?session_id={CHECKOUT_SESSION_ID}&payment_link_id=${metadata.projectId || metadata.budgetId}`,
         },
       },
     });

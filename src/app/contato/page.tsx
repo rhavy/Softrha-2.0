@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { FuturisticBackground } from "@/components/ui/futuristic-background";
 import {
   Mail,
@@ -14,12 +17,19 @@ import {
   Clock,
   Send,
   MessageSquare,
-  Calendar,
+  Calendar as CalendarIcon,
   CheckCircle2,
+  Video,
+  Mic,
+  ChevronLeft,
 } from "lucide-react";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { contactInfo } from "@/lib/contact-info";
 
 export default function Contato() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nome: "",
     email: "",
@@ -29,6 +39,16 @@ export default function Contato() {
     mensagem: "",
   });
 
+  // Estados para agendamento
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedPeriod, setSelectedPeriod] = useState<"manha" | "tarde" | "">("");
+  const [scheduledDates, setScheduledDates] = useState<Date[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [schedulePhone, setSchedulePhone] = useState("");
+  const [scheduleName, setScheduleName] = useState("");
+  const [scheduleStep, setScheduleStep] = useState<"date" | "confirm">("date");
+
   const fadeInUp = {
     initial: { opacity: 0, y: 20 },
     whileInView: { opacity: 1, y: 0 },
@@ -36,10 +56,237 @@ export default function Contato() {
     transition: { duration: 0.5 },
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Máscara de telefone
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+
+    if (digits.length <= 10) {
+      // Telefone fixo: (00) 0000-0000
+      return digits
+        .replace(/(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{4})(\d)/, "$1-$2")
+        .replace(/(-\d{4})\d+?$/, "$1");
+    } else {
+      // Celular: (00) 00000-0000
+      return digits
+        .replace(/(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{5})(\d)/, "$1-$2")
+        .replace(/(-\d{4})\d+?$/, "$1");
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    setFormData({ ...formData, telefone: formatted });
+  };
+
+  // Máscara de telefone para agendamento
+  const handleSchedulePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    setSchedulePhone(formatted);
+  };
+
+  // Carregar datas agendadas
+  const fetchScheduledDates = async () => {
+    try {
+      setScheduleLoading(true);
+      const response = await fetch("/api/agendamentos/datas");
+      if (response.ok) {
+        const data = await response.json();
+        setScheduledDates(data.dates.map((d: string) => new Date(d)));
+      }
+    } catch (error) {
+      console.error("Erro ao buscar datas agendadas:", error);
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
+  // Abrir dialog de agendamento
+  const handleOpenSchedule = () => {
+    fetchScheduledDates();
+    setScheduleDialogOpen(true);
+    setSelectedDate(undefined);
+    setSelectedPeriod("");
+    setSchedulePhone("");
+    setScheduleStep("date");
+  };
+
+  // Lidar com seleção de data
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+    setSelectedPeriod("");
+    // Quando selecionar data, vai para etapa do telefone
+    setScheduleStep("confirm");
+  };
+
+  // Validar telefone WhatsApp
+  const isValidWhatsApp = (phone: string) => {
+    const digits = phone.replace(/\D/g, "");
+    // WhatsApp brasileiro: 10 ou 11 dígitos (com ou sem 9 na frente)
+    // Aceita: (11) 99999-9999 ou (11) 9999-9999
+    return digits.length === 10 || digits.length === 11;
+  };
+
+  // Verificar se pode habilitar os botões (nome e WhatsApp válidos)
+  const canEnableButtons = () => {
+    return scheduleName.trim().length >= 2 && isValidWhatsApp(schedulePhone);
+  };
+
+  // Lidar com seleção de período e confirmar agendamento
+  const handlePeriodSelect = async (period: "manha" | "tarde") => {
+    if (!selectedDate) {
+      toast({
+        title: "Data obrigatória",
+        description: "Selecione uma data para continuar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!scheduleName.trim()) {
+      toast({
+        title: "Nome obrigatório",
+        description: "Informe seu nome para o agendamento",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isValidWhatsApp(schedulePhone)) {
+      toast({
+        title: "Telefone inválido",
+        description: "Insira um WhatsApp válido com 10 ou 11 dígitos (ex: 11999999999)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedPeriod(period);
+
+    try {
+      setScheduleLoading(true);
+      const response = await fetch("/api/agendamentos/criar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: selectedDate.toISOString(),
+          period,
+          phone: schedulePhone,
+          name: scheduleName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Agendamento realizado!",
+          description: "Confirmação será enviada no WhatsApp em breve.",
+          variant: "default",
+        });
+        setScheduleDialogOpen(false);
+        setScheduleStep("date");
+        setSchedulePhone("");
+        setScheduleName("");
+        setSelectedPeriod("");
+      } else {
+        toast({
+          title: "Erro",
+          description: result.error || "Erro ao agendar. Tente novamente.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao agendar:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao agendar. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    // Aqui você conectaria com sua API ou serviço de email
+
+    // Validar campos obrigatórios
+    if (!formData.nome || !formData.email || !formData.empresa || !formData.telefone || !formData.tipo || !formData.mensagem) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor, insira um email válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar telefone (mínimo 10 dígitos)
+    const phoneDigits = formData.telefone.replace(/\D/g, "");
+    if (phoneDigits.length < 10) {
+      toast({
+        title: "Telefone inválido",
+        description: "Por favor, insira um telefone válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/contato", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Mensagem enviada!",
+          description: result.message,
+          variant: "default",
+        });
+        // Limpar formulário
+        setFormData({
+          nome: "",
+          email: "",
+          empresa: "",
+          telefone: "",
+          tipo: "",
+          mensagem: "",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao enviar mensagem:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar mensagem. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (
@@ -47,13 +294,6 @@ export default function Contato() {
   ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-
-  const contactInfo = [
-    { icon: Mail, title: "Email", value: "contato@softrha.com", href: "mailto:contato@softrha.com" },
-    { icon: Phone, title: "Telefone", value: "+55 (11) 99999-9999", href: "tel:+551199999999" },
-    { icon: MapPin, title: "Localização", value: "São Paulo, SP - Brasil", href: "#" },
-    { icon: Clock, title: "Atendimento", value: "Seg-Sex: 9h às 18h", href: "#" },
-  ];
 
   return (
     <div className="flex flex-col min-h-screen relative bg-slate-950">
@@ -132,24 +372,27 @@ export default function Contato() {
 
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="empresa" className="text-cyan-100/90 text-xs uppercase tracking-wider">Empresa</Label>
+                          <Label htmlFor="empresa" className="text-cyan-100/90 text-xs uppercase tracking-wider">Empresa *</Label>
                           <Input
                             id="empresa"
                             name="empresa"
                             placeholder="Nome da sua empresa"
                             value={formData.empresa}
                             onChange={handleChange}
+                            required
                             className="bg-slate-950/50 border-cyan-400/20 text-white focus:border-cyan-400/60"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="telefone" className="text-cyan-100/90 text-xs uppercase tracking-wider">WhatsApp / Telefone</Label>
+                          <Label htmlFor="telefone" className="text-cyan-100/90 text-xs uppercase tracking-wider">WhatsApp / Telefone *</Label>
                           <Input
                             id="telefone"
                             name="telefone"
                             placeholder="(00) 00000-0000"
                             value={formData.telefone}
-                            onChange={handleChange}
+                            onChange={handlePhoneChange}
+                            required
+                            maxLength={15}
                             className="bg-slate-950/50 border-cyan-400/20 text-white focus:border-cyan-400/60"
                           />
                         </div>
@@ -157,20 +400,21 @@ export default function Contato() {
 
                       <div className="space-y-2">
                         <Label htmlFor="tipo" className="text-cyan-100/90 text-xs uppercase tracking-wider">Tipo de Projeto *</Label>
-                        <select
-                          id="tipo"
-                          name="tipo"
+                        <Select
                           value={formData.tipo}
-                          onChange={handleChange}
+                          onValueChange={(value) => setFormData({ ...formData, tipo: value })}
                           required
-                          className="flex h-10 w-full rounded-md border border-cyan-400/20 bg-slate-950/50 text-cyan-100 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400 appearance-none transition-all cursor-pointer"
                         >
-                          <option value="" className="bg-slate-900">Selecione uma categoria...</option>
-                          <option value="web" className="bg-slate-900">Desenvolvimento Web (SaaS, Portais)</option>
-                          <option value="mobile" className="bg-slate-900">Aplicativo Mobile (iOS/Android)</option>
-                          <option value="software" className="bg-slate-900">Software Sob Medida / ERP</option>
-                          <option value="consultoria" className="bg-slate-900">Consultoria / CTO as a Service</option>
-                        </select>
+                          <SelectTrigger className="bg-slate-950/50 border-cyan-400/20 text-cyan-100 focus:ring-cyan-400">
+                            <SelectValue placeholder="Selecione uma categoria..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-900 border-cyan-400/20">
+                            <SelectItem value="web" className="text-cyan-100 focus:bg-cyan-600 focus:text-white">Desenvolvimento Web (SaaS, Portais)</SelectItem>
+                            <SelectItem value="mobile" className="text-cyan-100 focus:bg-cyan-600 focus:text-white">Aplicativo Mobile (iOS/Android)</SelectItem>
+                            <SelectItem value="software" className="text-cyan-100 focus:bg-cyan-600 focus:text-white">Software Sob Medida / ERP</SelectItem>
+                            <SelectItem value="consultoria" className="text-cyan-100 focus:bg-cyan-600 focus:text-white">Consultoria / CTO as a Service</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">
@@ -187,9 +431,22 @@ export default function Contato() {
                         />
                       </div>
 
-                      <Button type="submit" className="w-full h-12 gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold shadow-lg shadow-cyan-900/20 uppercase tracking-widest text-xs transition-all active:scale-[0.98]">
-                        Enviar Solicitação
-                        <Send className="h-4 w-4" />
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full h-12 gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold shadow-lg shadow-cyan-900/20 uppercase tracking-widest text-xs transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            Enviar Solicitação
+                            <Send className="h-4 w-4" />
+                          </>
+                        )}
                       </Button>
                     </form>
                   </CardContent>
@@ -223,11 +480,11 @@ export default function Contato() {
                 <motion.div {...fadeInUp} transition={{ delay: 0.3 }}>
                   <Card className="bg-gradient-to-br from-cyan-950 to-blue-950 border-cyan-500/30 text-white shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10">
-                      <Calendar className="h-24 w-24" />
+                      <CalendarIcon className="h-24 w-24" />
                     </div>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
-                        <Calendar className="h-5 w-5 text-cyan-400" />
+                        <CalendarIcon className="h-5 w-5 text-cyan-400" />
                         Agende uma Reunião
                       </CardTitle>
                       <CardDescription className="text-cyan-100/60">
@@ -243,7 +500,11 @@ export default function Contato() {
                           <CheckCircle2 className="h-4 w-4 text-cyan-400" /> Estimativa de ROI e prazos
                         </li>
                       </ul>
-                      <Button className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold">
+                      <Button
+                        type="button"
+                        onClick={handleOpenSchedule}
+                        className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold"
+                      >
                         Ver Agenda Disponível
                       </Button>
                     </CardContent>
@@ -279,6 +540,158 @@ export default function Contato() {
           </div>
         </section>
       </main>
+
+      {/* Dialog de Agendamento */}
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent className="max-w-md bg-slate-900 border-cyan-400/20">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-cyan-400" />
+              Agende uma Reunião
+            </DialogTitle>
+            <DialogDescription className="text-cyan-100/60">
+              {scheduleStep === "date" && "Selecione um dia disponível para agendar sua reunião."}
+              {scheduleStep === "confirm" && "Informe seu WhatsApp e selecione o período para confirmação."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 mt-4">
+            {/* Etapa 1: Calendário */}
+            {scheduleStep === "date" && (
+              <div className="space-y-2">
+                <Label className="text-cyan-100/90 text-xs uppercase tracking-wider">
+                  {scheduleLoading ? "Carregando datas..." : "Selecione um dia:"}
+                </Label>
+                <CalendarComponent
+                  selectedDate={selectedDate}
+                  onSelectDate={handleDateSelect}
+                  disabledDates={scheduledDates}
+                  minDate={new Date()}
+                />
+              </div>
+            )}
+
+            {/* Etapa 2: Telefone e Período */}
+            {scheduleStep === "confirm" && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-4"
+              >
+                {/* Campo de Nome */}
+                <div className="space-y-2">
+                  <Label htmlFor="scheduleName" className="text-cyan-100/90 text-xs uppercase tracking-wider">
+                    Seu Nome *
+                  </Label>
+                  <Input
+                    id="scheduleName"
+                    type="text"
+                    placeholder="Ex: João Silva"
+                    value={scheduleName}
+                    onChange={(e) => setScheduleName(e.target.value)}
+                    className="bg-slate-950/50 border-cyan-400/20 text-white focus:border-cyan-400/60 transition-all"
+                  />
+                </div>
+
+                {/* Campo de Telefone */}
+                <div className="space-y-2">
+                  <Label htmlFor="schedulePhone" className="text-cyan-100/90 text-xs uppercase tracking-wider">
+                    WhatsApp para Confirmação *
+                  </Label>
+                  <Input
+                    id="schedulePhone"
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={schedulePhone}
+                    onChange={handleSchedulePhoneChange}
+                    maxLength={15}
+                    className="bg-slate-950/50 border-cyan-400/20 text-white focus:border-cyan-400/60 transition-all"
+                  />
+                  <p className="text-xs text-cyan-100/50">
+                    📱 Enviaremos uma mensagem de confirmação no WhatsApp
+                  </p>
+                </div>
+
+                {/* Data Selecionada */}
+                {selectedDate && (
+                  <div className="bg-cyan-950/30 border border-cyan-400/20 rounded-lg p-3">
+                    <p className="text-sm text-cyan-100/80 font-semibold mb-1">Data Selecionada:</p>
+                    <p className="text-cyan-400 font-medium">
+                      {selectedDate.toLocaleDateString("pt-BR", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                )}
+
+                {/* Seleção de Período */}
+                <div className="space-y-2">
+                  <Label className="text-cyan-100/90 text-xs uppercase tracking-wider">
+                    Horário preferido:
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={scheduleLoading || !canEnableButtons()}
+                      onClick={() => handlePeriodSelect("manha")}
+                      className={`h-14 gap-2 transition-all ${selectedPeriod === "manha"
+                        ? "bg-cyan-600 border-cyan-400 text-white"
+                        : "border-cyan-400/20 text-cyan-100 hover:bg-cyan-900"
+                        } ${!canEnableButtons() ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      <Mic className="h-5 w-5 text-cyan-800" />
+                      <div className="flex flex-col items-start text-cyan-800">
+                        <span className="font-semibold">Manhã</span>
+                        <span className="text-xs opacity-70">9h às 12h</span>
+                      </div>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={scheduleLoading || !canEnableButtons()}
+                      onClick={() => handlePeriodSelect("tarde")}
+                      className={`h-14 gap-2 transition-all ${selectedPeriod === "tarde"
+                        ? "bg-cyan-600 border-cyan-400 text-white"
+                        : "border-cyan-400/20 text-cyan-100 hover:bg-cyan-900"
+                        } ${!canEnableButtons() ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      <Mic className="h-5 w-5 text-cyan-800" />
+                      <div className="flex flex-col items-start text-cyan-800">
+                        <span className="font-semibold">Tarde</span>
+                        <span className="text-xs opacity-70">14h às 18h</span>
+                      </div>
+                    </Button>
+                  </div>
+                  {!canEnableButtons() && (schedulePhone.length < 11) && (
+                    <p className="text-xs text-amber-400">
+                      ⚠️ Preencha nome e WhatsApp (11 dígitos com 9) para habilitar
+                    </p>
+                  )}
+                </div>
+
+                {/* Botão Voltar */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setScheduleStep("date");
+                    setSelectedDate(undefined);
+                    setSelectedPeriod("");
+                  }}
+                  className="w-full border-cyan-400/20 text-cyan-400 hover:bg-cyan-900"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Voltar para selecionar data
+                </Button>
+              </motion.div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
