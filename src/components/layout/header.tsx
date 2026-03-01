@@ -52,11 +52,11 @@ export function Header() {
           </nav>
 
           <div className="hidden md:flex items-center space-x-4">
-            <Link href="/login">
+            {/* <Link href="/login">
               <Button variant="ghost" size="sm">
                 Entrar
               </Button>
-            </Link>
+            </Link> */}
             <Link href="/orcamento">
               <Button size="sm">
                 Orçamento
