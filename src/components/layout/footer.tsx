@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Github, Linkedin, Twitter, Mail, Sparkles, Rocket, Zap } from "lucide-react";
+import { emailContact, socialLinks } from "@/lib/contact-info";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -10,10 +11,10 @@ export function Footer() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Subtle gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-blue-500/5" />
-        
+
         {/* Grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
-        
+
         {/* Glowing orbs */}
         <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
@@ -35,7 +36,7 @@ export function Footer() {
               <span className="text-cyan-300 font-medium"> Next.js</span>,
               <span className="text-blue-300 font-medium"> TypeScript</span> e tecnologias modernas.
             </p>
-            
+
             {/* Tech badges */}
             <div className="flex flex-wrap gap-2 pt-2">
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs">
@@ -81,15 +82,7 @@ export function Footer() {
                   Serviços
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/projetos"
-                  className="text-sm text-cyan-100/70 hover:text-cyan-300 transition-colors flex items-center gap-2"
-                >
-                  <span className="w-1 h-1 rounded-full bg-cyan-400/50" />
-                  Projetos
-                </Link>
-              </li>
+
               <li>
                 <Link
                   href="/contato"
@@ -131,39 +124,28 @@ export function Footer() {
           {/* Contato */}
           <div>
             <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-              <Mail className="h-4 w-4 text-cyan-300" />
+              <emailContact.icon className="h-4 w-4 text-cyan-300" />
               Contato
             </h3>
             <div className="space-y-3">
               <a
-                href="mailto:contato@softrha.com"
+                href={emailContact.href}
                 className="flex items-center gap-2 text-sm text-cyan-100/70 hover:text-cyan-300 transition-colors"
               >
-                <Mail className="h-4 w-4" />
-                contato@softrha.com
+                <emailContact.icon className="h-4 w-4" />
+                {emailContact.email}
               </a>
               <div className="flex gap-3 pt-2">
-                <a
-                  href="#"
-                  className="text-cyan-100/70 hover:text-cyan-300 transition-colors p-2 rounded-lg bg-cyan-500/10 border border-cyan-400/20 hover:border-cyan-400/40"
-                  aria-label="GitHub"
-                >
-                  <Github className="h-5 w-5" />
-                </a>
-                <a
-                  href="#"
-                  className="text-cyan-100/70 hover:text-cyan-300 transition-colors p-2 rounded-lg bg-cyan-500/10 border border-cyan-400/20 hover:border-cyan-400/40"
-                  aria-label="LinkedIn"
-                >
-                  <Linkedin className="h-5 w-5" />
-                </a>
-                <a
-                  href="#"
-                  className="text-cyan-100/70 hover:text-cyan-300 transition-colors p-2 rounded-lg bg-cyan-500/10 border border-cyan-400/20 hover:border-cyan-400/40"
-                  aria-label="Twitter"
-                >
-                  <Twitter className="h-5 w-5" />
-                </a>
+                {socialLinks.map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    className="text-cyan-100/70 hover:text-cyan-300 transition-colors p-2 rounded-lg bg-cyan-500/10 border border-cyan-400/20 hover:border-cyan-400/40"
+                    aria-label={social.ariaLabel}
+                  >
+                    <social.icon className="h-5 w-5" />
+                  </a>
+                ))}
               </div>
             </div>
           </div>
