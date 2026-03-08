@@ -2291,7 +2291,7 @@ export default function ProjetoDetalhesPage() {
                           <div className="bg-white dark:bg-gray-950 rounded-lg p-4 border border-green-200 dark:border-green-800">
                             <p className="text-sm font-medium mb-2">Link de Reagendamento:</p>
                             <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
-                              {`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar`}
+                              {`${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar`}
                             </code>
                           </div>
 
@@ -2312,7 +2312,7 @@ export default function ProjetoDetalhesPage() {
                                     return;
                                   }
                                   const subject = `Reagende a Entrega do Seu Projeto - ${project.name}`;
-                                  const body = `Olá ${project.clientName}!\n\nIdentificamos que não foi possível realizar a entrega do seu projeto na data agendada.\n\nPor favor, reagende a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar\n\nVocê poderá escolher:\n- Data e horário de sua preferência\n- Tipo de entrega: Vídeo ou Áudio chamada\n\nAguardamos você!\n\nEquipe Softrha`;
+                                  const body = `Olá ${project.clientName}!\n\nIdentificamos que não foi possível realizar a entrega do seu projeto na data agendada.\n\nPor favor, reagende a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar\n\nVocê poderá escolher:\n- Data e horário de sua preferência\n- Tipo de entrega: Vídeo ou Áudio chamada\n\nAguardamos você!\n\nEquipe Softrha`;
 
                                   window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
 
@@ -2340,7 +2340,7 @@ export default function ProjetoDetalhesPage() {
                                     return;
                                   }
                                   const phoneDigits = phone.replace(/\D/g, "");
-                                  const message = `Olá ${project.clientName}!\n\nIdentificamos que não foi possível realizar a entrega do seu projeto na data agendada.\n\nPor favor, reagende a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar\n\nVocê poderá escolher data, horário e o tipo de entrega (vídeo ou áudio).\n\nAguardamos você!\n\nEquipe Softrha`;
+                                  const message = `Olá ${project.clientName}!\n\nIdentificamos que não foi possível realizar a entrega do seu projeto na data agendada.\n\nPor favor, reagende a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar\n\nVocê poderá escolher data, horário e o tipo de entrega (vídeo ou áudio).\n\nAguardamos você!\n\nEquipe Softrha`;
 
                                   window.open(`https://wa.me/55${phoneDigits}?text=${encodeURIComponent(message)}`, "_blank");
 
@@ -2360,7 +2360,7 @@ export default function ProjetoDetalhesPage() {
 
                             <Button
                               onClick={() => {
-                                const url = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar`;
+                                const url = `${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar`;
                                 navigator.clipboard.writeText(url);
                                 toast({
                                   title: "Link copiado!",
@@ -2404,7 +2404,7 @@ export default function ProjetoDetalhesPage() {
                       <div className="bg-white dark:bg-gray-950 rounded-lg p-4 border border-green-200 dark:border-green-800">
                         <p className="text-sm font-medium mb-2">Link de Agendamento:</p>
                         <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
-                          {`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar`}
+                          {`${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar`}
                         </code>
                       </div>
 
@@ -2425,7 +2425,7 @@ export default function ProjetoDetalhesPage() {
                                 return;
                               }
                               const subject = `Agende a Entrega do Seu Projeto - ${project.name}`;
-                              const body = `Olá ${project.clientName}!\n\nSeu projeto está 100% concluído e pronto para entrega! 🎉\n\nAgora você pode agendar a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar\n\nVocê poderá escolher:\n- Data e horário de sua preferência\n- Tipo de entrega: Vídeo ou Áudio chamada\n\nAguardamos você!\n\nEquipe Softrha`;
+                              const body = `Olá ${project.clientName}!\n\nSeu projeto está 100% concluído e pronto para entrega! 🎉\n\nAgora você pode agendar a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar\n\nVocê poderá escolher:\n- Data e horário de sua preferência\n- Tipo de entrega: Vídeo ou Áudio chamada\n\nAguardamos você!\n\nEquipe Softrha`;
 
                               window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
 
@@ -2453,7 +2453,7 @@ export default function ProjetoDetalhesPage() {
                                 return;
                               }
                               const phoneDigits = phone.replace(/\D/g, "");
-                              const message = `Olá ${project.clientName}! 🎉\n\nSeu projeto está 100% concluído e pronto para entrega!\n\nAgora você pode agendar a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar\n\nVocê poderá escolher data, horário e o tipo de entrega (vídeo ou áudio).\n\nAguardamos você!\n\nEquipe Softrha`;
+                              const message = `Olá ${project.clientName}! 🎉\n\nSeu projeto está 100% concluído e pronto para entrega!\n\nAgora você pode agendar a entrega no link abaixo:\n\n${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar\n\nVocê poderá escolher data, horário e o tipo de entrega (vídeo ou áudio).\n\nAguardamos você!\n\nEquipe Softrha`;
 
                               window.open(`https://wa.me/55${phoneDigits}?text=${encodeURIComponent(message)}`, "_blank");
 
@@ -2473,7 +2473,7 @@ export default function ProjetoDetalhesPage() {
 
                         <Button
                           onClick={() => {
-                            const url = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${params.id}/agendar`;
+                            const url = `${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${params.id}/agendar`;
                             navigator.clipboard.writeText(url);
                             toast({
                               title: "Link copiado!",

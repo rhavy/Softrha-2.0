@@ -1650,7 +1650,7 @@ export default function OrcamentoDetalhesPage() {
                     variant="outline"
                     className="w-full justify-start gap-2 h-auto py-3"
                     onClick={() => {
-                      const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/orcamento/aprovar/${budget.approvalToken}`;
+                      const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/orcamento/aprovar/${budget.approvalToken}`;
                       copyToClipboard(approvalUrl, "Link de aprovação copiado!");
                     }}
                   >

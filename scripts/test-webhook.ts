@@ -1,7 +1,7 @@
 
 
 // Configurações
-const API_URL = 'http://localhost:3000/api/webhooks/stripe';
+const API_URL = process.env.BETTER_AUTH_URL || 'http://localhost:3000/api/webhooks/stripe';
 const BUDGET_ID = process.argv[2]; // Pegar ID do budget passado no comando
 
 if (!BUDGET_ID) {

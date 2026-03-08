@@ -121,7 +121,7 @@ export function createNewBudgetEmailTemplate(data: {
             </div>
 
             <p style="text-align: center;">
-              <a href="http://localhost:3000/dashboard/orcamentos" class="cta-button">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/dashboard/orcamentos" class="cta-button">
                 Ver Orçamento no Dashboard
               </a>
             </p>
@@ -148,8 +148,8 @@ export function createNewBudgetEmailTemplate(data: {
     Tipo de Projeto: ${projectType}
     Valor Estimado: R$ ${estimatedMin.toLocaleString('pt-BR')} - R$ ${estimatedMax.toLocaleString('pt-BR')}
     ${details ? `Detalhes: ${details}` : ''}
-    
-    Acesse o dashboard para ver mais detalhes: http://localhost:3000/dashboard/orcamentos
+
+    Acesse o dashboard para ver mais detalhes: ${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/dashboard/orcamentos
   `;
 
   return { html, text };
@@ -230,7 +230,7 @@ export function createBudgetConfirmationEmailTemplate(data: {
             <p>SoftRha - Transformando ideias em soluções digitais</p>
             <p>Este é um email automático de confirmação.</p>
             <p style="margin-top: 10px;">
-              <a href="http://localhost:3000" style="color: #667eea; text-decoration: none;">Visite nosso site</a>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}" style="color: #667eea; text-decoration: none;">Visite nosso site</a>
             </p>
           </div>
         </div>
@@ -255,8 +255,8 @@ export function createBudgetConfirmationEmailTemplate(data: {
     
     Atenciosamente,
     Equipe SoftRha
-    
-    Visite nosso site: http://localhost:3000
+
+    Visite nosso site: ${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}
   `;
 
   return { html, text };

@@ -117,7 +117,7 @@ export async function POST(
                 <p>Para visualizar o documento atualizado e realizar a assinatura digital, clique no botão abaixo:</p>
 
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${updatedContract.id}"
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/contrato/assinatura/${updatedContract.id}"
                      style="display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
                     Acessar Documento Atualizado
                   </a>
@@ -151,7 +151,7 @@ export async function POST(
       // Preparar mensagem para WhatsApp
       if (sendWhatsApp && budget.clientPhone) {
         const phoneDigits = budget.clientPhone.replace(/\D/g, "");
-        const whatsappMessage = `Olá ${budget.clientName}! O contrato do seu projeto foi atualizado.\n\nProjeto: ${budget.projectType}\n\nAcesse: ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${updatedContract.id}`;
+        const whatsappMessage = `Olá ${budget.clientName}! O contrato do seu projeto foi atualizado.\n\nProjeto: ${budget.projectType}\n\nAcesse: ${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/contrato/assinatura/${updatedContract.id}`;
 
         const whatsappUrl = `https://wa.me/55${phoneDigits}?text=${encodeURIComponent(whatsappMessage)}`;
 
@@ -250,7 +250,7 @@ export async function POST(
               <p>Para visualizar o documento oficial e realizar a assinatura digital, clique no botão abaixo:</p>
 
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${contract.id}"
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/contrato/assinatura/${contract.id}"
                    style="display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
                   Acessar Documento e Assinar
                 </a>
@@ -285,7 +285,7 @@ export async function POST(
     // Preparar mensagem para WhatsApp
     if (sendWhatsApp && budget.clientPhone) {
       const phoneDigits = budget.clientPhone.replace(/\D/g, "");
-      const whatsappMessage = `Olá ${budget.clientName}! Seu contrato está pronto para assinatura.\n\nProjeto: ${budget.projectType}\n\nAcesse: ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/contrato/assinatura/${contract.id}`;
+      const whatsappMessage = `Olá ${budget.clientName}! Seu contrato está pronto para assinatura.\n\nProjeto: ${budget.projectType}\n\nAcesse: ${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/contrato/assinatura/${contract.id}`;
 
       const whatsappUrl = `https://wa.me/55${phoneDigits}?text=${encodeURIComponent(whatsappMessage)}`;
 

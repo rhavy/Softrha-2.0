@@ -54,7 +54,7 @@ export async function PUT(
     });
 
     // URL de aprovação (página frontend pública)
-    const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/orcamento/aprovar/${approvalToken}`;
+    const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/orcamento/aprovar/${approvalToken}`;
 
     // Enviar e-mail se solicitado e resend estiver configurado
     if (sendEmail && budget.clientEmail && resend) {

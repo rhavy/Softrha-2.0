@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
         const whatsappMessage = `Olá ${name}! 👋\n\nSeu agendamento de reunião foi confirmado!\n\n📅 Data: ${selectedDateFormatted}\n⏰ Período: ${meetingType}\n\nNossa equipe entrará em contato no horário agendado.\n\nAtenciosamente,\nEquipe Softrha`;
 
         // Enviar WhatsApp via servidor (fire and forget - não bloqueia a resposta)
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL;
         fetch(`${appUrl}/api/whatsapp/enviar`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

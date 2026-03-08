@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
                         <p><strong>Pagamento Final:</strong> R$ ${payment.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} ✅</p>
                       </div>
                       <p>Agora você pode agendar a entrega do projeto!</p>
-                      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projetos/${payment.projectId}/agendar"
+                      <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${payment.projectId}/agendar"
                          style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
                         Agendar Entrega
                       </a>

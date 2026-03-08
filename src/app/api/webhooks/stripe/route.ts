@@ -692,7 +692,7 @@ async function handleFinalPayment(payment: any, budget: any) {
 
             <p>Agora você pode agendar a entrega do projeto! Escolha o melhor dia e horário para receber a apresentação através de uma chamada de vídeo ou áudio.</p>
             
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/projetos/${project.id}/agendar" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL}/projetos/${project.id}/agendar"
                style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
               Agendar Entrega
             </a>
