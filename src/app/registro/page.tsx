@@ -92,8 +92,10 @@ export default function RegistroPage() {
     try {
       const response = await fetch("/api/auth/registro", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        // headers: { "Content-Type": "application/json" },
+        // body: JSON.stringify({
+        body: new URLSearchParams({
           name: formData.name,
           email: formData.email,
           password: formData.password,
@@ -102,6 +104,7 @@ export default function RegistroPage() {
           sex: formData.sex,
         }),
       });
+
 
       if (response.ok) {
         toast({
