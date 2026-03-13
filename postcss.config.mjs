@@ -12,11 +12,6 @@ const config = {
       },
       preserve: false
     },
-    tailwindcss: {},
-    '@tailwindcss/postcss': {}, // Use the new package here
-    autoprefixer: {},
-    'postcss-preset-env': {}, // Se você estiver usando este aqui
-    "autoprefixer": {},
   },
 };
 
