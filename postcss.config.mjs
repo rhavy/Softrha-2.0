@@ -12,6 +12,9 @@ const config = {
       },
       preserve: false
     },
+    tailwindcss: {},
+    autoprefixer: {},
+    'postcss-preset-env': {}, // Se você estiver usando este aqui
     "autoprefixer": {},
   },
 };
