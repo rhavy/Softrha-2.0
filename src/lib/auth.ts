@@ -56,6 +56,14 @@ export const auth = betterAuth({
   },
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
+  advanced: {
+    cookie: {
+      domain: process.env.COOKIE_DOMAIN || "www.softrha.com.br",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    },
+  },
 });
 
 export type Auth = typeof auth;
