@@ -15,7 +15,11 @@ export const config = {
 export default async function middleware(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl;
-    console.log("[PROXY] Pathname:", pathname);
+    
+    // Log todos os cookies para debug
+    const allCookies = request.cookies.getAll();
+    console.log("[MIDDLEWARE] Pathname:", pathname);
+    console.log("[MIDDLEWARE] Cookies:", JSON.stringify(allCookies.map(c => ({ name: c.name, value: c.value.substring(0, 20) + "..." }))));
 
     // Rotas protegidas que requerem autenticação
     const protectedRoutes = ["/dashboard", "/projetos"];
@@ -34,17 +38,15 @@ export default async function middleware(request: NextRequest) {
     const isUnverifiedRoute = pathname.startsWith(unverifiedRoute);
 
     // Verifica se tem cookie de sessão (pode ter nomes diferentes)
-    const sessionCookie = request.cookies.get("better-auth.session_token") || 
-                          request.cookies.get("better-auth.session-token");
+    const sessionCookie = request.cookies.get("better-auth.session_token") ||
+                          request.cookies.get("better-auth.session-token") ||
+                          request.cookies.get("authjs.session-token");
     
-    // Log todos os cookies para debug
-    const allCookies = request.cookies.getAll();
-    console.log("[PROXY] Todos os cookies:", allCookies.map(c => c.name).join(", ") || "Nenhum");
-    console.log("[PROXY] Session cookie:", sessionCookie ? "Presente" : "Ausente");
+    console.log("[MIDDLEWARE] Session cookie found:", !!sessionCookie);
 
     // Se não estiver autenticado e tentar acessar rota protegida
     if (!sessionCookie && isProtectedRoute) {
-      console.log("[PROXY] Não autenticado, redirecionando para login");
+      console.log("[MIDDLEWARE] Não autenticado, redirecionando para login");
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
