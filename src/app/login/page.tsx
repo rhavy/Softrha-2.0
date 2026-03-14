@@ -45,7 +45,7 @@ export default function Login() {
       const result = await authClient.signIn.email({
         email,
         password,
-        callbackURL: "/login",
+        callbackURL: "/dashboard",
       });
 
       console.log("[LOGIN] Resultado do login:", result);
@@ -55,14 +55,14 @@ export default function Login() {
         console.log("[LOGIN] Erro:", result.error);
       } else {
         console.log("[LOGIN] Login bem-sucedido! Redirecionando...");
-        
+
         // Aguardar cookie ser criado
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         // Verificar cookies
         console.log("[LOGIN] Cookies após login:", document.cookie);
-        
-        router.push("/login");
+
+        router.push("/dashboard");
         router.refresh();
       }
     } catch (err) {
