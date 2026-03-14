@@ -17,7 +17,7 @@ datasource db {
 model User {
   id            String   @id @default(cuid())
   name          String?
-  email         String   @unique
+  email         String   @unique @db.VarChar(255)
   emailVerified Boolean  @default(false)
   image         String?
   password      String?
@@ -92,7 +92,7 @@ model Session {
   id        String   @id @default(cuid())
   userId    String
   expiresAt DateTime
-  token     String   @unique
+  token     String   @unique @db.VarChar(255)
   userAgent String?
   ipAddress String?
   createdAt DateTime @default(now())
@@ -105,8 +105,8 @@ model Session {
 
 model Verification {
   id         String   @id @default(cuid())
-  identifier String
-  value      String   @db.VarChar(1000)
+  identifier String   @db.VarChar(255)
+  value      String   @db.VarChar(255)
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -352,7 +352,7 @@ model Budget {
   deletionDescription String? @db.Text // descrição do motivo (opcional)
 
   // Token para aprovação do cliente via link
-  approvalToken        String?   @unique
+  approvalToken        String?   @unique @db.VarChar(255)
   approvalTokenExpires DateTime?
   userApprovedAt       DateTime?
   startDate            DateTime? // Data de início do projeto
@@ -459,8 +459,8 @@ model Payment {
 // Modelo de Contrato
 model Contract {
   id               String    @id @default(cuid())
-  budgetId         String    @unique
-  projectId        String?   @unique
+  budgetId         String    @unique @db.VarChar(255)
+  projectId        String?   @unique @db.VarChar(255)
   documentUrl      String? // URL do contrato armazenado
   documentName     String? // Nome do arquivo
   status           String    @default("pending") // pending, sent, signed_by_client, signed, confirmed
@@ -483,7 +483,7 @@ model Contract {
 // Modelo de Agendamento de Entrega
 model Schedule {
   id                 String   @id @default(cuid())
-  projectId          String   @unique
+  projectId          String   @unique @db.VarChar(255)
   date               DateTime // Data do agendamento
   time               String // Horário do agendamento (HH:mm)
   type               String // video, audio
@@ -580,7 +580,7 @@ model Client {
   lastName       String
   name           String // Nome completo (calculado)
   documentType   String    @default("cpf") // cpf ou cnpj
-  document       String    @unique
+  document       String    @unique @db.VarChar(255)
   emails         String? // JSON: [{id, value, type, isPrimary}]
   phones         String? // JSON: [{id, value, type, isPrimary}]
   address        String?
@@ -649,7 +649,7 @@ model Event {
 
 model Settings {
   id        String   @id @default(cuid())
-  key       String   @unique
+  key       String   @unique @db.VarChar(255)
   value     Json
   updatedAt DateTime @updatedAt
 
@@ -682,7 +682,7 @@ model Notification {
 
 model UserNotificationPreference {
   id             String   @id @default(cuid())
-  userId         String   @unique
+  userId         String   @unique @db.VarChar(255)
   emailEnabled   Boolean  @default(true)
   pushEnabled    Boolean  @default(true)
   projectUpdates Boolean  @default(true)
