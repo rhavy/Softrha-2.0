@@ -31,6 +31,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+# Ensure static files are in the right place
+RUN mkdir -p ./_next/static && cp -r ./.next/static/* ./_next/static/ 2>/dev/null || true
+
 USER nextjs
 
 EXPOSE 3001
