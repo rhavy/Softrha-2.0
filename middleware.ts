@@ -10,8 +10,9 @@ export const config = {
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Verifica cookie de sessão
-  const sessionCookie = request.cookies.get("better-auth.session_token");
+  // Verifica cookie de sessão (pode ter prefixo __Secure- em produção)
+  const sessionCookie = request.cookies.get("__Secure-better-auth.session_token") ||
+                        request.cookies.get("better-auth.session_token");
 
   // Rotas protegidas que requerem autenticação
   const protectedRoutes = ["/dashboard", "/projetos"];
