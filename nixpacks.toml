@@ -2,7 +2,7 @@
 cmds = ["npm run build"]
 
 [start]
-cmd = "sh -c 'npx prisma migrate deploy && ./start.sh'"
+cmd = "sh -c 'npx prisma migrate deploy && npm run start'"
 
 [variables]
 NIXPACKS_NODE_VERSION = "22"
