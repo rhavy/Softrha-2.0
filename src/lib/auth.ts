@@ -45,12 +45,6 @@ export const auth = betterAuth({
       image: "image",
       createdAt: "createdAt",
       updatedAt: "updatedAt",
-      role: {
-        type: "string",
-        required: false,
-        defaultValue: "USER", // Valor do enum UserRole
-        input: false,
-      },
     },
   },
   secret: process.env.BETTER_AUTH_SECRET,
