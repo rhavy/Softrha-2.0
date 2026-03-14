@@ -39,21 +39,35 @@ export default function Login() {
     setError("");
     setLoading(true);
 
+    console.log("[LOGIN] Tentando login com email:", email);
+
     try {
       const result = await authClient.signIn.email({
         email,
         password,
-        callbackURL: "/dashboard",
+        callbackURL: "/login",
       });
+
+      console.log("[LOGIN] Resultado do login:", result);
 
       if (result.error) {
         setError(result.error.message || "Erro ao fazer login");
+        console.log("[LOGIN] Erro:", result.error);
       } else {
-        router.push("/dashboard");
+        console.log("[LOGIN] Login bem-sucedido! Redirecionando...");
+        
+        // Aguardar cookie ser criado
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verificar cookies
+        console.log("[LOGIN] Cookies após login:", document.cookie);
+        
+        router.push("/login");
         router.refresh();
       }
     } catch (err) {
       setError("Ocorreu um erro inesperado. Tente novamente.");
+      console.log("[LOGIN] Erro inesperado:", err);
     } finally {
       setLoading(false);
     }
