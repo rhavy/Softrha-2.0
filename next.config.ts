@@ -2,11 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  experimental: {
-    // Configurações para produção
-  },
-  // Garantir que assets estáticos sejam servidos corretamente
-  assetPrefix: process.env.NODE_ENV === 'production' ? undefined : undefined,
+  basePath: process.env.BASE_PATH || '',
+  assetPrefix: process.env.ASSET_PREFIX || '',
 };
 
 export default nextConfig;
