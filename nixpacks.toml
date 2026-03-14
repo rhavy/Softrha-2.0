@@ -2,7 +2,9 @@
 cmds = ["npm run build"]
 
 [start]
-cmd = "sh -c 'npx prisma migrate deploy && npm run start'"
+cmd = "sh -c 'npx prisma migrate deploy && node .next/standalone/server.js'"
 
 [variables]
 NIXPACKS_NODE_VERSION = "22"
+PORT = "3001"
+HOSTNAME = "0.0.0.0"
