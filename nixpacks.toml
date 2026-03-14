@@ -6,4 +6,4 @@ cmd = "sh -c 'npx prisma migrate deploy && node .next/standalone/server.js'"
 
 [variables]
 NIXPACKS_NODE_VERSION = "22"
-PORT = "3001"
+PORT = "3000"
