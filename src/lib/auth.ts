@@ -39,7 +39,6 @@ export const auth = betterAuth({
   user: {
     modelName: "User",
     fields: {
-      id: "id",
       email: "email",
       emailVerified: "emailVerified",
       name: "name",
