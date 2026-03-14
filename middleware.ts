@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "./src/lib/auth";
+import { prisma } from "./src/lib/prisma";
 
 export const config = {
   matcher: [
@@ -10,7 +12,7 @@ export const config = {
   ],
 };
 
-export default async function proxy(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl;
     console.log("[PROXY] Pathname:", pathname);
@@ -31,8 +33,13 @@ export default async function proxy(request: NextRequest) {
     const isAuthRoute = authRoutes.includes(pathname);
     const isUnverifiedRoute = pathname.startsWith(unverifiedRoute);
 
-    // Verifica se tem cookie de sessão
-    const sessionCookie = request.cookies.get("better-auth.session_token");
+    // Verifica se tem cookie de sessão (pode ter nomes diferentes)
+    const sessionCookie = request.cookies.get("better-auth.session_token") || 
+                          request.cookies.get("better-auth.session-token");
+    
+    // Log todos os cookies para debug
+    const allCookies = request.cookies.getAll();
+    console.log("[PROXY] Todos os cookies:", allCookies.map(c => c.name).join(", ") || "Nenhum");
     console.log("[PROXY] Session cookie:", sessionCookie ? "Presente" : "Ausente");
 
     // Se não estiver autenticado e tentar acessar rota protegida
@@ -53,8 +60,6 @@ export default async function proxy(request: NextRequest) {
 
       try {
         // Usar a API do Better Auth para validar sessão
-        const { auth } = await import("@/lib/auth");
-
         const session = await auth.api.getSession({
           headers: {
             cookie: `better-auth.session_token=${sessionCookie.value}`,
@@ -64,8 +69,6 @@ export default async function proxy(request: NextRequest) {
         console.log("[PROXY] Session via Better Auth:", session?.user ? "Encontrada" : "Não encontrada");
 
         if (session?.user) {
-          const prisma = (await import("@/lib/prisma")).prisma;
-
           console.log("[PROXY] User ID:", session.user.id);
 
           const user = await prisma.user.findUnique({

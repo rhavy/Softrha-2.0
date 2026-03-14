@@ -58,6 +58,7 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   advanced: {
     cookie: {
+      name: "better-auth.session_token",
       domain: process.env.COOKIE_DOMAIN || "www.softrha.com.br",
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
