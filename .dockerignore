@@ -50,3 +50,6 @@ __mocks__
 # Dev files
 turbo
 .cache
+
+# Shell scripts (keep start.sh)
+# !start.sh
