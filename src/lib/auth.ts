@@ -17,6 +17,7 @@ export const auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       enabled: true,
+      redirectURI: `${process.env.BETTER_AUTH_URL || 'https://www.softrha.com.br'}/api/auth/callback/google`,
     },
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || "",
