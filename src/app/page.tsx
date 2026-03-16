@@ -430,12 +430,6 @@ export default function Home() {
                   Solicitar Orçamento
                 </Button>
               </Link>
-              <Link href="/dashboard">
-                <Button variant="outline" size="lg" className="gap-2 h-14 px-8 text-lg border-cyan-400/50 hover:bg-cyan-500/20 text-cyan-100 hover:text-white backdrop-blur-sm">
-                  <Terminal className="h-6 w-6" />
-                  Acessar Dashboard
-                </Button>
-              </Link>
             </div>
           </motion.div>
         </div>
