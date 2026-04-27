@@ -1,8 +1,8 @@
 import Stripe from 'stripe';
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
-if (!stripeSecretKey) {
-  console.warn("[Stripe] WARNING: STRIPE_SECRET_KEY is not defined in environment variables!");
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder';
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.warn("[Stripe] WARNING: STRIPE_SECRET_KEY is not defined in environment variables! Using placeholder for build.");
 }
 
 export const stripe = new Stripe(stripeSecretKey, {
